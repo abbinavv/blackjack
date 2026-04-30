@@ -17,39 +17,31 @@ export function Hand({ hand, isActive, showScore = true, compact = false }: Hand
   }[hand.status];
 
   return (
-    <div className={`flex flex-col items-center gap-1 ${compact ? 'scale-90 origin-top' : ''}`}>
-      {/* Cards row */}
-      <div className="flex gap-[-8px]">
+    <div className="flex flex-col items-center gap-1">
+      {/* Cards */}
+      <div className="flex">
         {hand.cards.map((card, i) => (
-          <div key={`${card.suit}-${card.rank}-${i}`} style={{ marginLeft: i > 0 ? -18 : 0 }}>
-            <Card card={card} animate={true} />
+          <div key={`${card.suit}-${card.rank}-${i}`} style={{ marginLeft: i > 0 ? -20 : 0 }}>
+            <Card card={card} animate={true} small={compact} />
           </div>
         ))}
       </div>
 
-      {/* Score + status */}
       {showScore && (
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className={`text-sm font-bold ${statusColor}`}>
-            {hand.status === 'bust' ? 'BUST' :
-             hand.status === 'blackjack' ? '♠ BJ' :
-             hand.score}
+        <div className="flex items-center gap-1">
+          <span className={`text-xs font-bold ${statusColor}`}>
+            {hand.status === 'bust' ? 'BUST' : hand.status === 'blackjack' ? '♠ BJ' : hand.score}
           </span>
-          {hand.isDoubled && (
-            <span className="text-xs text-blue-400 font-bold">2x</span>
-          )}
-          {hand.isSplit && (
-            <span className="text-xs text-purple-400 font-bold">Split</span>
-          )}
+          {hand.isDoubled && <span className="text-[10px] text-blue-400 font-bold">2x</span>}
+          {hand.isSplit && <span className="text-[10px] text-purple-400 font-bold">split</span>}
           {isActive && hand.status === 'active' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-gold animate-pulse" />
+            <span className="w-1 h-1 rounded-full bg-gold animate-pulse" />
           )}
         </div>
       )}
 
-      {/* Bet */}
       {hand.bet > 0 && (
-        <div className="text-xs text-gold font-bold">${hand.bet}</div>
+        <div className="text-[10px] text-gold font-bold">${hand.bet.toLocaleString()}</div>
       )}
     </div>
   );
@@ -65,9 +57,9 @@ export function DealerHand({ cards, score, phase }: DealerHandProps) {
   const showScore = phase !== 'playing' && phase !== 'insurance' && phase !== 'dealing';
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="flex gap-1">
+      <div className="flex">
         {cards.map((card, i) => (
-          <div key={`d-${card.suit}-${card.rank}-${i}`} style={{ marginLeft: i > 0 ? -18 : 0 }}>
+          <div key={`d-${card.suit}-${card.rank}-${i}`} style={{ marginLeft: i > 0 ? -20 : 0 }}>
             <Card card={card} animate={true} />
           </div>
         ))}

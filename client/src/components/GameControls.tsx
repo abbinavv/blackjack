@@ -4,7 +4,8 @@ import { playButton } from '../lib/sounds';
 import { PublicPlayerHand } from '../types';
 
 function canDoubleHand(hand: PublicPlayerHand, balance: number): boolean {
-  return hand.cards.length === 2 && balance >= hand.bet;
+  // balance isn't deducted during play, so need 2x bet available in total balance
+  return hand.cards.length === 2 && balance >= hand.bet * 2;
 }
 
 function canSplitHand(hand: PublicPlayerHand, balance: number, totalHands: number): boolean {
@@ -80,27 +81,15 @@ export function GameControls() {
       <div className="text-gold text-sm font-bold tracking-wide animate-pulse">Your Turn</div>
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-2 justify-center">
-        <button className="btn-hit" onClick={() => emit('hit')}>
-          Hit
-        </button>
-        <button className="btn-stand" onClick={() => emit('stand')}>
-          Stand
-        </button>
-        <button
-          className="btn-double"
-          onClick={() => emit('doubleDown')}
-          disabled={!canDouble}
-          title={!canDouble ? 'Only on first 2 cards with enough balance' : ''}
-        >
+      <div className="grid grid-cols-2 sm:flex gap-2 justify-center w-full max-w-xs sm:max-w-none">
+        <button className="btn-hit text-sm py-2.5" onClick={() => emit('hit')}>Hit</button>
+        <button className="btn-stand text-sm py-2.5" onClick={() => emit('stand')}>Stand</button>
+        <button className="btn-double text-sm py-2.5" onClick={() => emit('doubleDown')}
+          disabled={!canDouble} title={!canDouble ? 'Need 2x bet in balance, first 2 cards only' : ''}>
           Double
         </button>
-        <button
-          className="btn-split"
-          onClick={() => emit('split')}
-          disabled={!canSplit}
-          title={!canSplit ? 'Need matching card values, max 4 hands' : ''}
-        >
+        <button className="btn-split text-sm py-2.5" onClick={() => emit('split')}
+          disabled={!canSplit} title={!canSplit ? 'Matching cards, max 4 hands' : ''}>
           Split
         </button>
       </div>

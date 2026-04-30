@@ -19,12 +19,20 @@
   /* ── Card ── */
   .playing-card {
     @apply relative rounded-lg shadow-xl select-none;
-    width: 72px;
-    height: 100px;
+    width: 62px;
+    height: 88px;
     background: #f5f0e8;
     border: 1px solid #d4c9b0;
     font-family: 'Playfair Display', serif;
   }
+
+  .playing-card.small {
+    width: 48px;
+    height: 68px;
+  }
+
+  .playing-card.small .card-rank-suit { font-size: 10px; }
+  .playing-card.small .card-center-suit { font-size: 1.4rem; }
 
   .playing-card.face-down {
     background:
