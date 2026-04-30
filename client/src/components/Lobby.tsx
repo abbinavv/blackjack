@@ -13,7 +13,21 @@ export function Lobby() {
   const connect = (cb: () => void) => {
     if (!socket.connected) {
       socket.connect();
-      socket.once('connect', () => { setMyId(socket.id!); cb(); });
+      const timeout = setTimeout(() => {
+        socket.off('connect');
+        setLoading(false);
+        setError('Cannot reach server — it may be waking up. Wait 30s and try again.');
+      }, 12000);
+      socket.once('connect', () => {
+        clearTimeout(timeout);
+        setMyId(socket.id!);
+        cb();
+      });
+      socket.once('connect_error', () => {
+        clearTimeout(timeout);
+        setLoading(false);
+        setError('Connection failed. Check your internet and try again.');
+      });
     } else {
       cb();
     }
