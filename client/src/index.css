@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: #0a0f14;
+    color: #f1faee;
+    font-family: 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* ── Card ── */
+  .playing-card {
+    @apply relative rounded-lg shadow-xl select-none;
+    width: 72px;
+    height: 100px;
+    background: #f5f0e8;
+    border: 1px solid #d4c9b0;
+    font-family: 'Playfair Display', serif;
+  }
+
+  .playing-card.face-down {
+    background:
+      repeating-linear-gradient(
+        45deg,
+        #0f2140 0px,
+        #0f2140 3px,
+        #1e3a5f 3px,
+        #1e3a5f 9px
+      );
+    border: 2px solid #c9a84c;
+  }
+
+  .playing-card.face-down::after {
+    content: '';
+    @apply absolute inset-2 rounded border border-gold/40;
+  }
+
+  .card-rank-suit {
+    @apply absolute top-1 left-1.5 leading-none font-bold;
+    font-size: 13px;
+  }
+
+  .card-rank-suit.bottom {
+    @apply top-auto bottom-1 left-auto right-1.5;
+    transform: rotate(180deg);
+  }
+
+  .card-center-suit {
+    @apply absolute inset-0 flex items-center justify-center;
+    font-size: 2rem;
+  }
+
+  .red-suit { color: #c0392b; }
+  .black-suit { color: #1a1a2e; }
+
+  /* ── Table felt ── */
+  .felt-table {
+    background: radial-gradient(ellipse 90% 80% at 50% 55%, #1d6b42 0%, #145233 50%, #0d3d28 100%);
+    border: 6px solid #4a2c0a;
+    box-shadow:
+      inset 0 0 60px rgba(0,0,0,0.5),
+      0 8px 32px rgba(0,0,0,0.8);
+  }
+
+  /* ── Chip ── */
+  .chip {
+    @apply rounded-full flex items-center justify-center font-bold cursor-pointer
+           select-none transition-all duration-150 border-4;
+    width: 52px;
+    height: 52px;
+    font-size: 11px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.5), inset 0 1px 2px rgba(255,255,255,0.2);
+  }
+
+  .chip:hover { transform: translateY(-3px) scale(1.08); }
+  .chip:active { transform: translateY(-1px) scale(1.03); }
+
+  /* ── Buttons ── */
+  .btn-action {
+    @apply px-6 py-3 rounded-lg font-bold text-sm tracking-wide
+           transition-all duration-150 active:scale-95 disabled:opacity-40
+           disabled:cursor-not-allowed disabled:transform-none;
+  }
+
+  .btn-primary {
+    @apply btn-action bg-gold text-[#0a0f14] hover:bg-gold-light shadow-lg;
+    box-shadow: 0 4px 15px rgba(201,168,76,0.3);
+  }
+
+  .btn-hit {
+    @apply btn-action bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg;
+  }
+
+  .btn-stand {
+    @apply btn-action bg-red-700 hover:bg-red-600 text-white shadow-lg;
+  }
+
+  .btn-double {
+    @apply btn-action bg-blue-700 hover:bg-blue-600 text-white shadow-lg;
+  }
+
+  .btn-split {
+    @apply btn-action bg-purple-700 hover:bg-purple-600 text-white shadow-lg;
+  }
+
+  .btn-ghost {
+    @apply btn-action border border-white/20 text-white/70 hover:text-white hover:border-white/40;
+  }
+
+  /* ── Player seat ── */
+  .player-seat {
+    @apply rounded-xl p-3 transition-all duration-300;
+    background: rgba(0,0,0,0.35);
+    border: 1px solid rgba(255,255,255,0.08);
+    min-width: 130px;
+  }
+
+  .player-seat.active-player {
+    background: rgba(201,168,76,0.12);
+    border-color: #c9a84c;
+    animation: pulse_gold 1.5s infinite;
+  }
+
+  .player-seat.my-seat {
+    border-color: rgba(255,255,255,0.25);
+  }
+
+  /* ── Status badges ── */
+  .badge {
+    @apply px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider;
+  }
+  .badge-blackjack { @apply badge bg-yellow-400 text-black; }
+  .badge-bust      { @apply badge bg-red-600 text-white; }
+  .badge-standing  { @apply badge bg-blue-600 text-white; }
+  .badge-win       { @apply badge bg-green-500 text-white; }
+  .badge-push      { @apply badge bg-gray-500 text-white; }
+
+  /* ── Timer ring ── */
+  .timer-ring {
+    @apply relative flex items-center justify-center rounded-full;
+    width: 44px;
+    height: 44px;
+    background: conic-gradient(
+      #c9a84c var(--pct, 100%),
+      rgba(255,255,255,0.1) var(--pct, 100%)
+    );
+  }
+
+  .timer-ring-inner {
+    @apply absolute inset-1.5 rounded-full bg-[#0a0f14] flex items-center justify-center
+           text-xs font-bold text-gold;
+  }
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
