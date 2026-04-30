@@ -9,7 +9,7 @@ import {
 } from './rules';
 
 const MIN_BET = 10;
-const MAX_BET = 500;
+const MAX_BET = 100000;
 const STARTING_BALANCE = 1000;
 const REBUY_AMOUNT = 200;
 const BETTING_SECONDS = 30;

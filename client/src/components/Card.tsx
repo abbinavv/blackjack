@@ -32,7 +32,7 @@ export function Card({ card, animate = true, small = false }: Props) {
     return (
       <div
         ref={ref}
-        className={`playing-card face-down animate-flipCard ${small ? 'scale-75 origin-top-left' : ''}`}
+        className={`playing-card face-down animate-flipCard ${small ? 'small' : ''}`}
       />
     );
   }
@@ -40,7 +40,7 @@ export function Card({ card, animate = true, small = false }: Props) {
   return (
     <div
       ref={ref}
-      className={`playing-card ${animate ? 'animate-dealIn' : ''} ${small ? 'scale-75 origin-top-left' : ''}`}
+      className={`playing-card ${animate ? 'animate-dealIn' : ''} ${small ? 'small' : ''}`}
     >
       <div className={`card-rank-suit ${suitClass}`}>
         <div>{card.rank}</div>
