@@ -2,6 +2,16 @@ import { socket } from '../lib/socket';
 import { useGameStore, clearSession } from '../store/gameStore';
 import { playButton } from '../lib/sounds';
 
+function fallbackCopy(text: string) {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.cssText = 'position:fixed;top:-999px;left:-999px;opacity:0';
+  document.body.appendChild(el);
+  el.select();
+  try { document.execCommand('copy'); } catch {}
+  document.body.removeChild(el);
+}
+
 export function WaitingRoom() {
   const { gameState, roomCode, myId, setRoomCode } = useGameStore();
   if (!gameState || !roomCode) return null;
@@ -25,8 +35,13 @@ export function WaitingRoom() {
   };
 
   const copyCode = () => {
-    navigator.clipboard.writeText(roomCode).catch(() => {});
     playButton();
+    // Use fallback that works without permission on older/mobile browsers
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(roomCode).catch(() => fallbackCopy(roomCode));
+    } else {
+      fallbackCopy(roomCode);
+    }
   };
 
   const toggleSitOut = () => {
