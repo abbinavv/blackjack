@@ -94,6 +94,11 @@ export function PlayerSeat({ player, playerIndex, gameState, isMe, hideCards = f
           </span>
         )}
 
+        {/* Disconnected indicator */}
+        {player.isDisconnected && (
+          <span className="text-[9px] text-orange-400 animate-pulse font-bold">⚡ disconnected</span>
+        )}
+
         {/* Turn timer */}
         {isCurrentTurn && gameState.turnTimeLeft <= 10 && (
           <div className="timer-ring scale-75"

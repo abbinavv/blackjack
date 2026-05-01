@@ -9,12 +9,13 @@ import {
 } from './rules';
 
 const MIN_BET = 10;
-const MAX_BET = 100000;
+const MAX_BET = 1000;
 const STARTING_BALANCE = 1000;
 const REBUY_AMOUNT = 200;
 const BETTING_SECONDS = 30;
 const INSURANCE_SECONDS = 10;
 const TURN_SECONDS = 45;
+const DISCONNECT_GRACE_MS = 60_000;
 
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -26,13 +27,14 @@ function makeHand(cards: Card[], bet: number, isSplit = false): PlayerHand {
 
 export class GameRoom extends EventEmitter {
   private state: GameState;
-  private pendingBets = new Map<string, number>(); // playerId → bet amount
+  private pendingBets = new Map<string, number>();
   private bettingTimer: NodeJS.Timeout | null = null;
   private insuranceTimer: NodeJS.Timeout | null = null;
   private turnTimer: NodeJS.Timeout | null = null;
   private bettingInterval: NodeJS.Timeout | null = null;
   private insuranceInterval: NodeJS.Timeout | null = null;
   private turnInterval: NodeJS.Timeout | null = null;
+  private disconnectTimers = new Map<string, NodeJS.Timeout>();
 
   constructor(roomCode: string, hostId: string, hostName: string, savedBalance?: number) {
     super();
@@ -62,7 +64,8 @@ export class GameRoom extends EventEmitter {
       hands: [], activeHandIndex: 0,
       insuranceBet: 0,
       hasBet: false, hasActedOnInsurance: false,
-      isHost, isSittingOut: false, wasRebought: false,
+      isHost, isSittingOut: false, wantsSitOut: false,
+      wasRebought: false, isDisconnected: false,
     };
   }
 
@@ -89,25 +92,81 @@ export class GameRoom extends EventEmitter {
     if (!player) return;
 
     if (this.state.phase === 'playing' || this.state.phase === 'dealer') {
-      // Forfeit bets, mark all hands standing so turn advances
-      for (const hand of player.hands) {
-        hand.status = 'standing';
-      }
+      for (const hand of player.hands) hand.status = 'standing';
     }
 
     this.state.players = this.state.players.filter(p => p.id !== id);
-
     if (this.state.players.length === 0) return;
 
     if (!this.state.players.some(p => p.isHost)) {
       this.state.players[0].isHost = true;
     }
 
-    // Fix currentPlayerIndex if needed
     if (this.state.currentPlayerIndex >= this.state.players.length) {
       this.state.currentPlayerIndex = this.state.players.length - 1;
     }
   }
+
+  // Mark as disconnected during active game — grace period to rejoin
+  markDisconnected(playerId: string): void {
+    const player = this.getPlayer(playerId);
+    if (!player) return;
+    player.isDisconnected = true;
+
+    // Clear any existing timer
+    const existing = this.disconnectTimers.get(playerId);
+    if (existing) clearTimeout(existing);
+
+    // Auto-advance if it's their turn
+    if (this.state.phase === 'playing') {
+      const cur = this.state.players[this.state.currentPlayerIndex];
+      if (cur?.id === playerId) this.autoStand();
+    }
+
+    // If disconnected during betting, mark them as sitting out this round
+    if (this.state.phase === 'betting' && !player.hasBet) {
+      player.hasBet = true;
+      player.isSittingOut = true;
+      const active = this.state.players.filter(p => !p.isSittingOut);
+      if (active.every(p => p.hasBet)) {
+        this.clearBettingTimer();
+        this.startDealing();
+        return;
+      }
+    }
+
+    this.broadcast(`${player.name} disconnected`);
+  }
+
+  scheduleDisconnectCleanup(playerId: string, onCleanup: () => void): void {
+    const timer = setTimeout(() => {
+      const player = this.getPlayer(playerId);
+      if (player?.isDisconnected) {
+        this.removePlayer(playerId);
+        onCleanup();
+      }
+      this.disconnectTimers.delete(playerId);
+    }, DISCONNECT_GRACE_MS) as unknown as NodeJS.Timeout;
+    this.disconnectTimers.set(playerId, timer);
+  }
+
+  rejoinPlayer(newSocketId: string, name: string): string | null {
+    const player = this.state.players.find(
+      p => p.name.toLowerCase() === name.toLowerCase() && p.isDisconnected
+    );
+    if (!player) return null;
+    const oldId = player.id;
+    player.id = newSocketId;
+    player.isDisconnected = false;
+
+    // Cancel cleanup timer
+    const timer = this.disconnectTimers.get(oldId);
+    if (timer) { clearTimeout(timer); this.disconnectTimers.delete(oldId); }
+
+    return oldId;
+  }
+
+  getPhase(): GamePhase { return this.state.phase; }
 
   getPlayer(id: string): Player | undefined {
     return this.state.players.find(p => p.id === id);
@@ -120,11 +179,40 @@ export class GameRoom extends EventEmitter {
   isEmpty(): boolean { return this.state.players.length === 0; }
   getPlayerCount(): number { return this.state.players.length; }
 
+  // ─── Sit-out management ─────────────────────────────────────────────────────
+
+  setSitOut(playerId: string, sitOut: boolean): void {
+    const player = this.getPlayer(playerId);
+    if (!player) return;
+
+    const allowedPhases: GamePhase[] = ['waiting', 'complete', 'betting'];
+    if (!allowedPhases.includes(this.state.phase)) return;
+
+    player.wantsSitOut = sitOut;
+    player.isSittingOut = sitOut;
+
+    if (this.state.phase === 'betting') {
+      if (sitOut && !player.hasBet) {
+        player.hasBet = true; // treated as opted out
+        const active = this.state.players.filter(p => !p.isSittingOut);
+        if (active.length === 0 || active.every(p => p.hasBet)) {
+          this.clearBettingTimer();
+          this.startDealing();
+          return;
+        }
+      } else if (!sitOut) {
+        player.hasBet = false; // re-enable betting
+      }
+    }
+
+    this.broadcast(`${player.name} ${sitOut ? 'sits out' : 'is back in'}`);
+  }
+
   // ─── Game flow ──────────────────────────────────────────────────────────────
 
   startGame(playerId: string): boolean {
     if (!this.isHost(playerId)) return false;
-    const active = this.state.players.filter(p => !p.isSittingOut);
+    const active = this.state.players.filter(p => !p.wantsSitOut);
     if (active.length < 2) return false;
     if (this.state.phase !== 'waiting' && this.state.phase !== 'complete') return false;
     this.startBettingPhase();
@@ -137,19 +225,19 @@ export class GameRoom extends EventEmitter {
     this.state.round++;
     this.state.bettingTimeLeft = BETTING_SECONDS;
 
-    // Rebuy players at $0
     for (const p of this.state.players) {
       if (p.balance === 0) {
         p.balance = REBUY_AMOUNT;
         p.wasRebought = true;
+        p.wantsSitOut = false; // rebuy re-enters player
       } else {
         p.wasRebought = false;
       }
-      p.isSittingOut = false;
+      p.isSittingOut = p.wantsSitOut;
+      p.hasBet = p.isSittingOut; // sitting-out players skip betting
       p.hands = [];
       p.activeHandIndex = 0;
       p.insuranceBet = 0;
-      p.hasBet = false;
       p.hasActedOnInsurance = false;
     }
     this.state.dealerHand = [];
@@ -167,9 +255,9 @@ export class GameRoom extends EventEmitter {
       this.state.bettingTimeLeft--;
       if (this.state.bettingTimeLeft <= 0) {
         this.clearBettingTimer();
-        // Auto min-bet for players who haven't bet
+        // Auto min-bet for players who can afford it and haven't bet
         for (const p of this.state.players) {
-          if (!p.hasBet && p.balance >= MIN_BET) {
+          if (!p.isSittingOut && !p.hasBet && p.balance >= MIN_BET) {
             this.pendingBets.set(p.id, MIN_BET);
             p.hasBet = true;
           }
@@ -184,13 +272,25 @@ export class GameRoom extends EventEmitter {
   placeBet(playerId: string, amount: number): boolean {
     if (this.state.phase !== 'betting') return false;
     const player = this.getPlayer(playerId);
-    if (!player || player.hasBet) return false;
-    const bet = Math.max(MIN_BET, Math.min(MAX_BET, Math.floor(amount)));
-    if (player.balance < bet) return false;
+    if (!player || player.hasBet || player.isSittingOut) return false;
+
+    const requested = Math.floor(amount);
+    const isAllIn = requested >= player.balance;
+    // All-in bypasses MAX_BET cap; regular bets are capped at 1000
+    const bet = isAllIn
+      ? player.balance
+      : Math.max(MIN_BET, Math.min(MAX_BET, requested));
+
+    if (bet < MIN_BET || bet > player.balance) return false;
+
     this.pendingBets.set(playerId, bet);
     player.hasBet = true;
-    this.broadcast(`${player.name} placed $${bet}`);
-    // Check if all active players have bet
+
+    const label = isAllIn && bet > MAX_BET
+      ? `${player.name} went ALL IN — $${bet}!`
+      : `${player.name} bet $${bet}`;
+    this.broadcast(label);
+
     const active = this.state.players.filter(p => !p.isSittingOut);
     if (active.every(p => p.hasBet)) {
       this.clearBettingTimer();
@@ -203,9 +303,8 @@ export class GameRoom extends EventEmitter {
     this.state.phase = 'dealing';
     this.broadcast('Dealing cards...');
 
-    // Assign bets from pending map
     for (const p of this.state.players) {
-      if (p.hasBet) {
+      if (p.hasBet && !p.isSittingOut) {
         const bet = this.pendingBets.get(p.id) ?? MIN_BET;
         p.hands = [makeHand([], bet)];
       } else {
@@ -216,7 +315,6 @@ export class GameRoom extends EventEmitter {
 
     const active = this.state.players.filter(p => !p.isSittingOut);
 
-    // Deal 2 rounds
     for (let round = 0; round < 2; round++) {
       for (const player of active) {
         const [card, deck] = dealCard(this.state.deck, true);
@@ -225,7 +323,6 @@ export class GameRoom extends EventEmitter {
         this.broadcast();
         await delay(280);
       }
-      // Dealer card: first face-up, second face-down
       const [dCard, deck2] = dealCard(this.state.deck, round === 0);
       this.state.dealerHand.push(dCard);
       this.state.deck = deck2;
@@ -233,19 +330,14 @@ export class GameRoom extends EventEmitter {
       await delay(280);
     }
 
-    // Check cut card
     if (this.state.deck.length <= this.state.cutCardPosition) {
       this.state.needsReshuffle = true;
     }
 
-    // Mark blackjacks
     for (const p of active) {
-      if (isBlackjack(p.hands[0].cards)) {
-        p.hands[0].status = 'blackjack';
-      }
+      if (isBlackjack(p.hands[0].cards)) p.hands[0].status = 'blackjack';
     }
 
-    // Check if dealer shows Ace → insurance phase
     if (this.state.dealerHand[0].rank === 'A') {
       this.startInsurancePhase();
     } else {
@@ -267,7 +359,6 @@ export class GameRoom extends EventEmitter {
         this.startPlayingPhase();
       } else {
         this.broadcast();
-        // If all active players acted, skip wait
         const active = this.state.players.filter(p => !p.isSittingOut);
         if (active.every(p => p.hasActedOnInsurance)) {
           this.clearInsuranceTimer();
@@ -302,7 +393,6 @@ export class GameRoom extends EventEmitter {
     const idx = this.findNextActivePlayer(-1);
 
     if (idx === -1) {
-      // All players have blackjack or are sitting out
       this.dealerTurn();
       return;
     }
@@ -339,9 +429,7 @@ export class GameRoom extends EventEmitter {
     for (let i = fromIndex + 1; i < this.state.players.length; i++) {
       const p = this.state.players[i];
       if (p.isSittingOut) continue;
-      // Check if player has any active hand
-      const hasActive = p.hands.some(h => h.status === 'active');
-      if (hasActive) return i;
+      if (p.hands.some(h => h.status === 'active')) return i;
     }
     return -1;
   }
@@ -384,7 +472,6 @@ export class GameRoom extends EventEmitter {
     if (!player || player.id !== playerId) return false;
     const hand = this.getCurrentActiveHand();
     if (!hand || hand.status !== 'active') return false;
-
     hand.status = 'standing';
     this.broadcast();
     this.advanceTurn();
@@ -419,24 +506,21 @@ export class GameRoom extends EventEmitter {
     const hand = this.getCurrentActiveHand();
     if (!hand || !canSplit(hand)) return false;
     if (player.balance < hand.bet) return false;
-    if (player.hands.length >= 4) return false; // max 4 hands
+    if (player.hands.length >= 4) return false;
 
     const card2 = hand.cards.pop()!;
     const newHand = makeHand([card2], hand.bet, true);
     hand.isSplit = true;
     player.hands.splice(player.activeHandIndex + 1, 0, newHand);
 
-    // Deal one card to current hand
     const [c1, deck1] = dealCard(this.state.deck, true);
     hand.cards.push(c1);
     this.state.deck = deck1;
 
-    // Deal one card to new hand
     const [c2, deck2] = dealCard(this.state.deck, true);
     newHand.cards.push(c2);
     this.state.deck = deck2;
 
-    // Aces: only 1 card each → auto-stand both
     if (hand.cards[0].rank === 'A') {
       hand.status = 'standing';
       newHand.status = 'standing';
@@ -454,7 +538,6 @@ export class GameRoom extends EventEmitter {
     const player = this.state.players[this.state.currentPlayerIndex];
 
     if (player) {
-      // Advance to next hand of current player
       const nextHandIdx = player.hands.findIndex(
         (h, i) => i > player.activeHandIndex && h.status === 'active'
       );
@@ -466,7 +549,6 @@ export class GameRoom extends EventEmitter {
       }
     }
 
-    // Move to next player
     const nextIdx = this.findNextActivePlayer(this.state.currentPlayerIndex);
     if (nextIdx === -1) {
       this.dealerTurn();
@@ -483,12 +565,10 @@ export class GameRoom extends EventEmitter {
   private async dealerTurn(): Promise<void> {
     this.state.phase = 'dealer';
 
-    // Reveal hole card
     for (const c of this.state.dealerHand) c.faceUp = true;
     this.broadcast('Dealer reveals...');
     await delay(900);
 
-    // Check dealer blackjack
     if (isBlackjack(this.state.dealerHand)) {
       this.broadcast('Dealer has Blackjack!');
       await delay(600);
@@ -496,7 +576,6 @@ export class GameRoom extends EventEmitter {
       return;
     }
 
-    // Dealer draws
     while (dealerShouldHit(this.state.dealerHand)) {
       const [card, deck] = dealCard(this.state.deck, true);
       this.state.dealerHand.push(card);
@@ -519,7 +598,6 @@ export class GameRoom extends EventEmitter {
       let net = 0;
       for (const hand of player.hands) {
         net += calculatePayout(hand, this.state.dealerHand, player.insuranceBet, dealerBJ);
-        // Only count insurance on first hand
         player.insuranceBet = 0;
       }
       player.balance = Math.max(0, player.balance + net);
@@ -552,7 +630,11 @@ export class GameRoom extends EventEmitter {
     this.clearTurnTimer();
   }
 
-  destroy(): void { this.clearTimers(); }
+  destroy(): void {
+    this.clearTimers();
+    for (const t of this.disconnectTimers.values()) clearTimeout(t);
+    this.disconnectTimers.clear();
+  }
 
   getPublicState(): PublicGameState {
     return {
@@ -576,6 +658,8 @@ export class GameRoom extends EventEmitter {
         hasActedOnInsurance: p.hasActedOnInsurance,
         isHost: p.isHost,
         isSittingOut: p.isSittingOut,
+        wantsSitOut: p.wantsSitOut,
+        isDisconnected: p.isDisconnected,
       })),
       dealerHand: this.state.dealerHand,
       dealerScore: handScore(this.state.dealerHand),

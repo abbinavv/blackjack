@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Card as CardType } from '../types';
 import { playCardFlip } from '../lib/sounds';
 
@@ -17,30 +17,41 @@ export function Card({ card, animate = true, small = false }: Props) {
   const symbol = SUIT_SYMBOL[card.suit];
   const suitClass = isRed ? 'red-suit' : 'black-suit';
   const ref = useRef<HTMLDivElement>(null);
+  const prevFaceUp = useRef(card.faceUp);
+  const [flipping, setFlipping] = useState(false);
 
+  // Flip animation: face-down → face-up
+  useEffect(() => {
+    if (!prevFaceUp.current && card.faceUp) {
+      playCardFlip();
+      setFlipping(true);
+      const t = setTimeout(() => setFlipping(false), 400);
+      prevFaceUp.current = card.faceUp;
+      return () => clearTimeout(t);
+    }
+    prevFaceUp.current = card.faceUp;
+  }, [card.faceUp]);
+
+  // Deal-in animation for new cards
   useEffect(() => {
     if (!animate) return;
-    playCardFlip();
     const el = ref.current;
     if (!el) return;
     el.classList.remove('animate-dealIn');
-    void el.offsetWidth; // reflow
+    void el.offsetWidth;
     el.classList.add('animate-dealIn');
   }, [animate]);
 
   if (!card.faceUp) {
     return (
-      <div
-        ref={ref}
-        className={`playing-card face-down animate-flipCard ${small ? 'small' : ''}`}
-      />
+      <div ref={ref} className={`playing-card face-down ${small ? 'small' : ''}`} />
     );
   }
 
   return (
     <div
       ref={ref}
-      className={`playing-card ${animate ? 'animate-dealIn' : ''} ${small ? 'small' : ''}`}
+      className={`playing-card ${flipping ? 'animate-flipCard' : animate ? 'animate-dealIn' : ''} ${small ? 'small' : ''}`}
     >
       <div className={`card-rank-suit ${suitClass}`}>
         <div>{card.rank}</div>

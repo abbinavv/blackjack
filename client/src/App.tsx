@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { socket } from './lib/socket';
-import { useGameStore } from './store/gameStore';
+import { useGameStore, loadSession, clearSession } from './store/gameStore';
 import { PublicGameState } from './types';
 import { Lobby } from './components/Lobby';
 import { WaitingRoom } from './components/WaitingRoom';
@@ -8,19 +8,34 @@ import { Table } from './components/Table';
 import { ToastContainer } from './components/Toast';
 
 export function App() {
-  const { gameState, roomCode, setGameState, setMyId, addToast, setError } = useGameStore();
+  const { gameState, roomCode, setGameState, setMyId, setRoomCode, setPlayerName, addToast, setError } = useGameStore();
   const prevPhase = useRef<string | null>(null);
 
   useEffect(() => {
-    socket.on('connect', () => setMyId(socket.id!));
+    socket.on('connect', () => {
+      const id = socket.id!;
+      setMyId(id);
+
+      // Attempt to rejoin a previous session after page refresh
+      const session = loadSession();
+      if (session) {
+        socket.emit('rejoinRoom', { roomCode: session.roomCode, name: session.playerName }, (ok: boolean) => {
+          if (ok) {
+            setRoomCode(session.roomCode);
+            setPlayerName(session.playerName);
+          } else {
+            clearSession();
+          }
+        });
+      }
+    });
 
     socket.on('gameState', (state: PublicGameState) => {
       setGameState(state);
     });
 
     socket.on('toast', (msg: string) => {
-      addToast(msg);
-      setTimeout(() => useGameStore.getState().removeToast(msg), 3500);
+      addToast(msg, 'info');
     });
 
     socket.on('error', (msg: string) => {
@@ -41,7 +56,6 @@ export function App() {
     };
   }, []);
 
-  // Render
   return (
     <>
       <ToastContainer />

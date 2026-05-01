@@ -39,11 +39,29 @@ export function setupSocketHandlers(io: Server): void {
       io.to(roomCode).emit('gameState', room.getPublicState());
     });
 
+    // Rejoin mid-game after refresh
+    socket.on('rejoinRoom', (
+      { roomCode, name }: { roomCode: string; name: string },
+      cb: (ok: boolean) => void
+    ) => {
+      const room = rooms.get(roomCode);
+      if (!room) return cb(false);
+      const oldId = room.rejoinPlayer(socket.id, name);
+      if (!oldId) return cb(false);
+      playerRoom.delete(oldId);
+      playerRoom.set(socket.id, roomCode);
+      socket.join(roomCode);
+      cb(true);
+      socket.emit('gameState', room.getPublicState());
+      io.to(roomCode).emit('gameState', room.getPublicState());
+      io.to(roomCode).emit('toast', `${name} reconnected`);
+    });
+
     socket.on('startGame', (roomCode: string) => {
       const room = rooms.get(roomCode);
       if (!room) return;
       if (!room.startGame(socket.id)) {
-        socket.emit('error', 'Need at least 2 players to start');
+        socket.emit('error', 'Need at least 2 active players to start');
       }
     });
 
@@ -53,6 +71,10 @@ export function setupSocketHandlers(io: Server): void {
 
     socket.on('placeInsurance', ({ roomCode, amount }: { roomCode: string; amount: number }) => {
       rooms.get(roomCode)?.placeInsurance(socket.id, amount);
+    });
+
+    socket.on('sitOut', ({ roomCode, sitOut }: { roomCode: string; sitOut: boolean }) => {
+      rooms.get(roomCode)?.setSitOut(socket.id, sitOut);
     });
 
     socket.on('hit', (roomCode: string) => { rooms.get(roomCode)?.hit(socket.id); });
@@ -73,8 +95,31 @@ export function setupSocketHandlers(io: Server): void {
       const code = playerRoom.get(socket.id);
       if (!code) return;
       const room = rooms.get(code);
-      if (room) {
-        const name = room.getPlayer(socket.id)?.name;
+      if (!room) { playerRoom.delete(socket.id); return; }
+
+      const player = room.getPlayer(socket.id);
+      const phase = room.getPhase();
+      const activePhases = ['betting', 'dealing', 'insurance', 'playing', 'dealer'];
+
+      if (player && activePhases.includes(phase)) {
+        // Keep in game during active round — grace period to reconnect
+        room.markDisconnected(socket.id);
+        io.to(code).emit('gameState', room.getPublicState());
+
+        room.scheduleDisconnectCleanup(socket.id, () => {
+          const r = rooms.get(code);
+          if (!r) return;
+          if (r.isEmpty()) {
+            r.destroy();
+            rooms.delete(code);
+          } else {
+            io.to(code).emit('gameState', r.getPublicState());
+            io.to(code).emit('toast', `${player.name} left the game`);
+          }
+          playerRoom.delete(socket.id);
+        });
+      } else {
+        const name = player?.name;
         room.removePlayer(socket.id);
         if (room.isEmpty()) {
           room.destroy();
@@ -83,8 +128,8 @@ export function setupSocketHandlers(io: Server): void {
           io.to(code).emit('gameState', room.getPublicState());
           if (name) io.to(code).emit('toast', `${name} left the game`);
         }
+        playerRoom.delete(socket.id);
       }
-      playerRoom.delete(socket.id);
     });
   });
 }

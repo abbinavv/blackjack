@@ -28,7 +28,9 @@ export interface Player {
   hasActedOnInsurance: boolean;
   isHost: boolean;
   isSittingOut: boolean;
+  wantsSitOut: boolean;
   wasRebought: boolean;
+  isDisconnected: boolean;
 }
 
 export interface GameState {
@@ -68,6 +70,8 @@ export interface PublicPlayer {
   hasActedOnInsurance: boolean;
   isHost: boolean;
   isSittingOut: boolean;
+  wantsSitOut: boolean;
+  isDisconnected: boolean;
 }
 
 export interface PublicGameState {

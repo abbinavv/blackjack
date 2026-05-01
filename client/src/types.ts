@@ -29,6 +29,8 @@ export interface PublicPlayer {
   hasActedOnInsurance: boolean;
   isHost: boolean;
   isSittingOut: boolean;
+  wantsSitOut: boolean;
+  isDisconnected: boolean;
 }
 
 export interface PublicGameState {

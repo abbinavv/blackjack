@@ -11,13 +11,21 @@ export function ToastContainer() {
           ⚠ {error}
         </div>
       )}
-      {toasts.map((t, i) => (
+      {toasts.map(t => (
         <div
-          key={i}
-          className="px-4 py-3 rounded-xl text-sm font-medium animate-slideUp shadow-xl"
-          style={{ background: 'rgba(15,25,35,0.95)', border: '1px solid rgba(255,255,255,0.15)', color: '#f1faee' }}
+          key={t.id}
+          className="px-4 py-3 rounded-xl text-sm font-bold animate-slideUp shadow-xl"
+          style={{
+            background: t.type === 'win'
+              ? 'rgba(20,80,30,0.97)'
+              : t.type === 'loss'
+              ? 'rgba(100,15,15,0.97)'
+              : 'rgba(15,25,35,0.95)',
+            border: `1px solid ${t.type === 'win' ? '#4ade80' : t.type === 'loss' ? '#f87171' : 'rgba(255,255,255,0.15)'}`,
+            color: t.type === 'win' ? '#4ade80' : t.type === 'loss' ? '#f87171' : '#f1faee',
+          }}
         >
-          {t}
+          {t.msg}
         </div>
       ))}
     </div>
