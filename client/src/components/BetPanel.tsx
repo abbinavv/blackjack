@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
 import { playChipClink, playButton } from '../lib/sounds';
@@ -16,8 +16,8 @@ const CHIPS = [
 export function BetPanel() {
   const { gameState, roomCode, myId } = useGameStore();
   const [bet, setBet] = useState(0);
-  const [customInput, setCustomInput] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
+  const [inputVal, setInputVal] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
   if (!gameState || !roomCode) return null;
   const me = gameState.players.find(p => p.id === myId);
@@ -26,40 +26,40 @@ export function BetPanel() {
   const timeLeft = gameState.bettingTimeLeft;
   const pct = (timeLeft / 30) * 100;
   const canAffordMin = me.balance >= MIN_BET;
+  const effectiveMax = Math.min(me.balance, MAX_BET);
+
+  const setAndSync = (val: number) => {
+    setBet(val);
+    setInputVal(val > 0 ? String(val) : '');
+  };
 
   const addChip = (value: number) => {
-    const next = Math.min(bet + value, Math.min(me.balance, MAX_BET));
-    setBet(next);
+    const next = Math.min(bet + value, effectiveMax);
+    setAndSync(next);
     playChipClink();
   };
 
-  const applyQuick = (val: number) => {
-    setBet(val);
-    playChipClink();
-  };
-
-  const applyCustom = () => {
-    const parsed = parseInt(customInput.replace(/[^0-9]/g, ''), 10);
-    if (!isNaN(parsed) && parsed >= MIN_BET && parsed <= me.balance) {
-      setBet(Math.min(parsed, MAX_BET <= me.balance ? MAX_BET : me.balance));
-      playChipClink();
+  const handleInputChange = (raw: string) => {
+    setInputVal(raw);
+    const n = parseInt(raw.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(n)) {
+      setBet(Math.min(n, me.balance)); // allow typing above MAX_BET (will be validated on submit)
+    } else if (raw === '') {
+      setBet(0);
     }
-    setCustomInput('');
-    setShowCustom(false);
   };
 
-  const placeBet = (amount: number) => {
+  const handleInputBlur = () => {
+    // Clamp to valid range on blur
+    const clamped = Math.max(0, Math.min(bet, me.balance));
+    setAndSync(clamped);
+  };
+
+  const placeBet = (amount: number, allIn = false) => {
     if (amount < MIN_BET || amount > me.balance) return;
     playButton();
-    socket.emit('placeBet', { roomCode, amount });
-    setBet(0);
-  };
-
-  const goAllIn = () => {
-    playButton();
-    // allIn: true tells server to use its own player.balance (guards against stale client state)
-    socket.emit('placeBet', { roomCode, amount: me.balance, allIn: true });
-    setBet(0);
+    socket.emit('placeBet', { roomCode, amount, allIn });
+    setAndSync(0);
   };
 
   const sitOut = () => {
@@ -75,7 +75,7 @@ export function BetPanel() {
         <div className="text-center">
           <div className="text-red-400 font-bold text-sm">Insufficient Balance</div>
           <div className="text-white/40 text-xs mt-0.5">Minimum bet is ${MIN_BET}</div>
-          <div className="text-xs text-white/50 mt-1">Balance: <span className="text-gold">${me.balance}</span></div>
+          <div className="text-green-400 font-bold text-sm mt-1">${me.balance} remaining</div>
         </div>
         <button onClick={sitOut} className="btn-ghost w-full text-sm py-2.5">
           Sit Out This Round
@@ -97,11 +97,13 @@ export function BetPanel() {
     );
   }
 
+  const betIsValid = bet >= MIN_BET && bet <= me.balance;
+
   return (
     <div className="animate-slideUp flex flex-col items-center gap-3 p-4 rounded-2xl w-full max-w-sm mx-auto"
          style={{ background: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.1)' }}>
 
-      {/* Header row */}
+      {/* Header */}
       <div className="flex items-center justify-between w-full">
         <span className="text-xs text-white/50 uppercase tracking-widest font-bold">Place Bet</span>
         <div className="flex items-center gap-2">
@@ -115,22 +117,44 @@ export function BetPanel() {
         </div>
       </div>
 
-      {/* Bet amount display */}
-      <div className="text-center leading-none">
-        <div className="text-4xl font-black font-display tabular-nums"
-             style={{ color: bet > 0 ? '#c9a84c' : 'rgba(255,255,255,0.15)' }}>
-          ${bet.toLocaleString()}
+      {/* Direct bet amount input — always visible */}
+      <div className="w-full">
+        <div className="relative flex items-center">
+          <span className="absolute left-3 text-xl font-black text-gold pointer-events-none">$</span>
+          <input
+            ref={inputRef}
+            type="number"
+            min={MIN_BET}
+            max={me.balance}
+            value={inputVal}
+            onChange={e => handleInputChange(e.target.value)}
+            onBlur={handleInputBlur}
+            onFocus={e => e.target.select()}
+            placeholder="0"
+            className="w-full pl-8 pr-4 py-3 rounded-xl text-2xl font-black text-center tabular-nums
+                       text-gold focus:outline-none transition-colors"
+            style={{
+              background: 'rgba(201,168,76,0.08)',
+              border: `1px solid ${betIsValid ? 'rgba(201,168,76,0.4)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          />
+          {bet > 0 && (
+            <button onClick={() => setAndSync(0)}
+              className="absolute right-3 text-white/30 hover:text-red-400 text-lg leading-none">
+              ✕
+            </button>
+          )}
         </div>
-        <div className="text-xs text-white/35 mt-1">
-          Balance: <span className="text-green-400 font-bold">${me.balance.toLocaleString()}</span>
-          {me.balance > MAX_BET && <span className="text-white/25"> · max regular ${MAX_BET}</span>}
+        <div className="flex justify-between text-xs mt-1 px-1">
+          <span className="text-white/30">min ${MIN_BET}</span>
+          <span className="text-green-400/70">balance ${me.balance.toLocaleString()}</span>
         </div>
       </div>
 
       {/* Chips */}
       <div className="flex gap-2 justify-center">
         {CHIPS.map(chip => {
-          const canAdd = bet + chip.value <= Math.min(me.balance, MAX_BET);
+          const canAdd = bet + chip.value <= me.balance;
           return (
             <button key={chip.value} onClick={() => addChip(chip.value)} disabled={!canAdd}
               className="chip" style={{ background: chip.bg, borderColor: chip.border, color: '#fff', opacity: canAdd ? 1 : 0.25 }}>
@@ -141,67 +165,43 @@ export function BetPanel() {
       </div>
 
       {/* Quick presets */}
-      <div className="flex gap-1.5 flex-wrap justify-center">
+      <div className="flex gap-1.5 justify-center">
         {[
           { label: 'Min', val: MIN_BET },
-          { label: '¼', val: Math.floor(Math.min(me.balance, MAX_BET) / 4) },
-          { label: '½', val: Math.floor(Math.min(me.balance, MAX_BET) / 2) },
-          { label: 'Max', val: Math.min(me.balance, MAX_BET) },
+          { label: '¼', val: Math.floor(effectiveMax / 4) },
+          { label: '½', val: Math.floor(effectiveMax / 2) },
+          { label: 'Max', val: effectiveMax },
         ].map(({ label, val }) => (
-          <button key={label} onClick={() => applyQuick(val)}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors font-bold">
+          <button key={label} onClick={() => { setAndSync(val); playChipClink(); }}
+            className="text-xs px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors font-bold">
             {label}
           </button>
         ))}
-        <button onClick={() => setShowCustom(v => !v)}
-          className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors font-bold ${showCustom ? 'bg-gold/20 text-gold' : 'bg-white/10 hover:bg-white/20 text-white/70'}`}>
-          #
-        </button>
-        <button onClick={() => { setBet(0); playChipClink(); }}
-          className="text-xs px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/50 hover:text-red-400 transition-colors">
-          ✕
-        </button>
       </div>
 
-      {/* Custom amount input */}
-      {showCustom && (
-        <div className="flex gap-2 w-full animate-slideUp">
-          <input
-            type="number"
-            value={customInput}
-            onChange={e => setCustomInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && applyCustom()}
-            placeholder={`${MIN_BET}–${Math.min(me.balance, MAX_BET).toLocaleString()}`}
-            className="flex-1 px-3 py-2 rounded-lg text-sm text-white text-center font-bold
-                       focus:outline-none focus:border-gold/50 transition-colors"
-            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' }}
-          />
-          <button onClick={applyCustom}
-            className="px-4 py-2 rounded-lg text-sm font-bold bg-white/15 hover:bg-white/25 text-white transition-colors">
-            Set
-          </button>
-        </div>
-      )}
-
-      {/* Place Bet + All In */}
+      {/* Place Bet + All In row */}
       <div className="flex gap-2 w-full">
-        <button onClick={() => placeBet(bet)} disabled={bet < MIN_BET}
-          className="btn-primary flex-1 text-sm py-2.5 font-bold">
-          Bet ${bet > 0 ? bet.toLocaleString() : '—'}
+        <button
+          onClick={() => placeBet(bet)}
+          disabled={!betIsValid}
+          className="btn-primary flex-1 text-sm py-2.5 font-bold"
+        >
+          {betIsValid ? `Bet $${bet.toLocaleString()}` : 'Place Bet'}
         </button>
-        {me.balance > 0 && (
-          <button onClick={goAllIn}
-            className="px-4 py-2.5 rounded-lg text-sm font-black tracking-wide transition-all active:scale-95
-                       border-2 border-red-500 text-red-400 hover:bg-red-500/20"
-            title={`All In — $${me.balance.toLocaleString()}`}>
-            ALL IN
-          </button>
-        )}
+        <button
+          onClick={() => placeBet(me.balance, true)}
+          className="px-4 py-2.5 rounded-lg text-sm font-black tracking-wide transition-all active:scale-95
+                     border-2 border-red-500 text-red-400 hover:bg-red-500/20"
+          title={`All In — $${me.balance.toLocaleString()}`}
+        >
+          ALL IN<br/>
+          <span className="text-[10px] font-bold opacity-70">${me.balance.toLocaleString()}</span>
+        </button>
       </div>
 
-      {/* Sit out link */}
+      {/* Sit out */}
       <button onClick={sitOut}
-        className="text-xs text-white/30 hover:text-white/60 transition-colors">
+        className="text-xs text-white/25 hover:text-white/50 transition-colors">
         Sit out this round
       </button>
     </div>
