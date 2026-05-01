@@ -57,7 +57,8 @@ export function BetPanel() {
 
   const goAllIn = () => {
     playButton();
-    socket.emit('placeBet', { roomCode, amount: me.balance });
+    // allIn: true tells server to use its own player.balance (guards against stale client state)
+    socket.emit('placeBet', { roomCode, amount: me.balance, allIn: true });
     setBet(0);
   };
 

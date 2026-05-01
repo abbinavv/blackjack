@@ -65,8 +65,8 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    socket.on('placeBet', ({ roomCode, amount }: { roomCode: string; amount: number }) => {
-      rooms.get(roomCode)?.placeBet(socket.id, amount);
+    socket.on('placeBet', ({ roomCode, amount, allIn }: { roomCode: string; amount: number; allIn?: boolean }) => {
+      rooms.get(roomCode)?.placeBet(socket.id, amount, allIn);
     });
 
     socket.on('placeInsurance', ({ roomCode, amount }: { roomCode: string; amount: number }) => {

@@ -269,14 +269,14 @@ export class GameRoom extends EventEmitter {
     }, 1000) as unknown as NodeJS.Timeout;
   }
 
-  placeBet(playerId: string, amount: number): boolean {
+  placeBet(playerId: string, amount: number, forceAllIn = false): boolean {
     if (this.state.phase !== 'betting') return false;
     const player = this.getPlayer(playerId);
     if (!player || player.hasBet || player.isSittingOut) return false;
 
     const requested = Math.floor(amount);
-    const isAllIn = requested >= player.balance;
-    // All-in bypasses MAX_BET cap; regular bets are capped at 1000
+    // forceAllIn flag from client guarantees server uses real balance (avoids stale-client bug)
+    const isAllIn = forceAllIn || requested >= player.balance;
     const bet = isAllIn
       ? player.balance
       : Math.max(MIN_BET, Math.min(MAX_BET, requested));
@@ -286,7 +286,7 @@ export class GameRoom extends EventEmitter {
     this.pendingBets.set(playerId, bet);
     player.hasBet = true;
 
-    const label = isAllIn && bet > MAX_BET
+    const label = isAllIn
       ? `${player.name} went ALL IN — $${bet}!`
       : `${player.name} bet $${bet}`;
     this.broadcast(label);
