@@ -47,7 +47,7 @@ export function InsurancePanel() {
         <br />Max bet: <span className="text-gold">${maxInsurance}</span>
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 w-full">
         <input
           type="range"
           min={0}
@@ -55,20 +55,28 @@ export function InsurancePanel() {
           step={5}
           value={amount}
           onChange={e => { setAmount(Number(e.target.value)); playChipClink(); }}
-          className="w-32 accent-gold"
+          className="flex-1 accent-gold"
         />
-        <span className="text-gold font-bold text-sm w-12">${amount}</span>
+        <span className="text-gold font-bold text-sm tabular-nums w-14 text-right">${amount}</span>
+      </div>
+
+      {/* Quick amounts */}
+      <div className="flex gap-2 w-full">
+        {[0, Math.floor(maxInsurance / 2), maxInsurance].map(v => (
+          <button key={v} onClick={() => { setAmount(v); playChipClink(); }}
+            className={`flex-1 text-xs py-1.5 rounded-lg font-bold transition-colors ${
+              amount === v ? 'bg-gold/25 text-gold border border-gold/40' : 'bg-white/8 text-white/50 hover:bg-white/15'
+            }`}>
+            {v === 0 ? 'None' : v === maxInsurance ? 'Max' : `$${v}`}
+          </button>
+        ))}
       </div>
 
       <div className="flex gap-2 w-full">
-        <button
-          onClick={() => submit(amount)}
-          disabled={amount <= 0}
-          className="btn-primary flex-1 text-sm py-2"
-        >
+        <button onClick={() => submit(amount)} disabled={amount <= 0} className="btn-primary flex-1 text-sm py-2.5">
           Insure ${amount}
         </button>
-        <button onClick={() => submit(0)} className="btn-ghost flex-1 text-sm py-2">
+        <button onClick={() => submit(0)} className="btn-ghost flex-1 text-sm py-2.5">
           No Thanks
         </button>
       </div>

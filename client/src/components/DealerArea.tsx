@@ -24,9 +24,6 @@ export function DealerArea({ gameState }: Props) {
         <span className="badge badge-bust animate-slideUp">Dealer Bust</span>
       )}
 
-      {phase === 'dealer' && (
-        <span className="text-xs text-white/50 animate-pulse">Dealer playing...</span>
-      )}
     </div>
   );
 }
