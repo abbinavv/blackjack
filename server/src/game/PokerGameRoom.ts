@@ -123,9 +123,10 @@ export class PokerGameRoom extends EventEmitter {
 
   addPlayer(id: string, name: string, savedBalance?: number): boolean {
     if (this.state.players.length >= 6) return false;
-    if (this.state.phase !== 'waiting') return false;
+    // Allow joining between hands (waiting/showdown); block during active hand
+    if (this.isActivePhase()) return false;
     this.state.players.push(this.makePlayer(id, name, savedBalance));
-    this.broadcastState();
+    this.broadcastState(`${this.state.players[this.state.players.length - 1].name} joined`);
     return true;
   }
 

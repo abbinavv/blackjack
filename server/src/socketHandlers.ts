@@ -56,7 +56,14 @@ export function setupSocketHandlers(io: Server): void {
     ) => {
       const room = rooms.get(roomCode);
       if (!room) return cb(false, 'Room not found');
-      if (!room.addPlayer(socket.id, name, savedBalance)) return cb(false, 'Room full or game in progress');
+      // Give specific feedback for poker mid-hand
+      if (room instanceof PokerGameRoom) {
+        const activePhases = ['pre-flop', 'flop', 'turn', 'river'];
+        if (activePhases.includes(room.getPhase())) {
+          return cb(false, 'Hand in progress — join after this hand finishes');
+        }
+      }
+      if (!room.addPlayer(socket.id, name, savedBalance)) return cb(false, 'Room is full');
 
       if (room instanceof PokerGameRoom) {
         room.on('privateCards', (cardsMap: Map<string, [Card, Card]>) => {

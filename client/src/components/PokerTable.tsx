@@ -527,7 +527,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
   const padX   = Math.round(ovalW * 0.14);   // seat space left/right of oval
   const padY   = Math.round(ovalH * 0.55);   // seat space above/below oval
   const canvasW = ovalW + padX * 2;
-  const canvasH = ovalH + padY * 2 + CARD_DIMS['lg'][1] + 10;
+  const canvasH = ovalH + padY * 2;
 
   const cx = canvasW / 2;
   const cy = padY + ovalH / 2;
@@ -674,17 +674,6 @@ export function PokerTable({ onLeave }: PokerTableProps) {
             );
           })}
 
-          {/* My hole cards — large, bottom-center of canvas */}
-          {myCards && (
-            <div style={{
-              position: 'absolute', bottom: 2, left: '50%',
-              transform: 'translateX(-50%)',
-              display: 'flex', gap: 12,
-            }}>
-              {myCards.map((c, i) => <PokerCard key={i} card={c} size="lg" />)}
-            </div>
-          )}
-
           {/* Showdown winners */}
           {state.phase === 'showdown' && state.winners && state.winners.length > 0 && (
             <div style={{
@@ -709,6 +698,19 @@ export function PokerTable({ onLeave }: PokerTableProps) {
           )}
         </div>
       </div>
+
+      {/* ── My hole cards — always visible strip above controls ── */}
+      {myCards && (
+        <div style={{
+          flexShrink: 0,
+          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 14,
+          padding: '10px 0 6px',
+          background: 'rgba(0,0,0,0.4)',
+          borderTop: '1px solid rgba(255,255,255,0.07)',
+        }}>
+          {myCards.map((c, i) => <PokerCard key={i} card={c} size="lg" />)}
+        </div>
+      )}
 
       {/* ── Bottom controls ── */}
       <div style={{ flexShrink: 0 }}>

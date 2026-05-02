@@ -82,8 +82,14 @@ export class GameRoom extends EventEmitter {
 
   addPlayer(id: string, name: string, savedBalance?: number): boolean {
     if (this.state.players.length >= 6) return false;
-    if (this.state.phase !== 'waiting') return false;
-    this.state.players.push(this.makePlayer(id, name, savedBalance));
+    const p = this.makePlayer(id, name, savedBalance);
+    if (this.state.phase !== 'waiting') {
+      // Mid-game join: sit out current round, auto-join next
+      p.isSittingOut = true;
+      p.hasBet = true; // don't stall the current betting phase
+    }
+    this.state.players.push(p);
+    this.broadcast(`${name} joined`);
     return true;
   }
 
