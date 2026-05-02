@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card as CardType } from '../types';
-import { playCardFlip } from '../lib/sounds';
+import { playCardFlip, playDeal } from '../lib/sounds';
 
 const SUIT_SYMBOL: Record<string, string> = {
   hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠',
@@ -19,6 +19,12 @@ export function Card({ card, animate = true, small = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const prevFaceUp = useRef(card.faceUp);
   const [flipping, setFlipping] = useState(false);
+
+  // Play deal sound once when a new face-up card is mounted
+  useEffect(() => {
+    if (card.faceUp && animate) playDeal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!prevFaceUp.current && card.faceUp) {

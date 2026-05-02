@@ -318,19 +318,18 @@ export class PokerGameRoom extends EventEmitter {
     this.state.activeIndex = utgIdx;
     this.state.lastAggressorIndex = bbIdx;
 
-    // toAct: everyone except BB (who already bet), starting from UTG
-    // all active (non-all-in) players need to act, BB acts last
+    // toAct: all active players from UTG → BB order; BB acts last (option to raise)
+    // Build by going UTG → ... → SB, then append BB separately to avoid duplicates
     this.state.toAct = [];
     let cur = utgIdx;
     const seen = new Set<number>();
     while (!seen.has(cur)) {
       seen.add(cur);
       const p = this.state.players[cur];
-      if (p.status === 'active') this.state.toAct.push(p.id);
+      if (p.status === 'active' && p.id !== bbPlayer.id) this.state.toAct.push(p.id);
       cur = this.nextActiveIndex(cur);
       if (cur === utgIdx) break;
     }
-    // BB needs to act last (can raise even if no one raised)
     if (bbPlayer.status === 'active') {
       this.state.toAct.push(bbPlayer.id);
     }

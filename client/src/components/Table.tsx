@@ -140,15 +140,16 @@ export function Table() {
   const { gameState: rawState, roomCode, myId, playerName } = useGameStore();
   const [showInfo, setShowInfo] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
+  const prevReshuffle = useRef(false);
+  // Safe access before the early return so hooks aren't called conditionally
+  const needsReshuffle = (rawState as PublicGameState | null)?.needsReshuffle;
+  useEffect(() => {
+    if (needsReshuffle && !prevReshuffle.current) playShuffle();
+    prevReshuffle.current = !!needsReshuffle;
+  }, [needsReshuffle]);
 
   if (!rawState || !roomCode) return null;
   const gameState = rawState as PublicGameState;
-
-  const prevReshuffle = useRef(false);
-  useEffect(() => {
-    if (gameState.needsReshuffle && !prevReshuffle.current) playShuffle();
-    prevReshuffle.current = !!gameState.needsReshuffle;
-  }, [gameState.needsReshuffle]);
 
   const me = gameState.players.find(p => p.id === myId);
   const myIndex = gameState.players.findIndex(p => p.id === myId);

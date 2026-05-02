@@ -135,7 +135,7 @@ export function WaitingRoom() {
               disabled={!canStart}
               className="btn-primary w-full py-4 text-base"
             >
-              {canStart ? 'Start Game →' : `Need ${2 - activePlayers.length} more active player(s)`}
+              {canStart ? 'Start Game →' : `Need ${2 - activePlayers.length} more ${2 - activePlayers.length === 1 ? 'player' : 'players'}`}
             </button>
             {!canStart && (
               <p className="text-center text-white/30 text-xs">Share the room code to invite friends</p>
