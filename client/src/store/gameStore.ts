@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PublicGameState } from '../types';
+import { PublicGameState, AnyGameState } from '../types';
 
 export interface Toast {
   id: number;
@@ -10,16 +10,18 @@ export interface Toast {
 let toastCounter = 0;
 
 interface GameStore {
-  gameState: PublicGameState | null;
+  gameState: AnyGameState | null;
   myId: string | null;
   roomCode: string | null;
   playerName: string | null;
+  gameType: 'blackjack' | 'roulette' | null;
   error: string | null;
   toasts: Toast[];
-  setGameState: (s: PublicGameState) => void;
+  setGameState: (s: AnyGameState) => void;
   setMyId: (id: string) => void;
   setRoomCode: (code: string | null) => void;
   setPlayerName: (name: string) => void;
+  setGameType: (type: 'blackjack' | 'roulette' | null) => void;
   setError: (e: string | null) => void;
   addToast: (msg: string, type?: Toast['type']) => void;
   removeToast: (id: number) => void;
@@ -30,12 +32,14 @@ export const useGameStore = create<GameStore>((set) => ({
   myId: null,
   roomCode: null,
   playerName: null,
+  gameType: null,
   error: null,
   toasts: [],
   setGameState: (s) => set({ gameState: s }),
   setMyId: (id) => set({ myId: id }),
   setRoomCode: (code) => set({ roomCode: code }),
   setPlayerName: (name) => set({ playerName: name }),
+  setGameType: (type) => set({ gameType: type }),
   setError: (e) => set({ error: e }),
   addToast: (msg, type = 'info') => {
     const id = ++toastCounter;
@@ -57,20 +61,26 @@ export function loadBalance(name: string): number {
   return isNaN(n) || n <= 0 ? 1000 : Math.min(n, 50000);
 }
 
-export function saveSession(roomCode: string, playerName: string) {
-  localStorage.setItem('bj_session', JSON.stringify({ roomCode, playerName }));
+export function saveSession(roomCode: string, playerName: string, gameType: 'blackjack' | 'roulette') {
+  localStorage.setItem('bj_session', JSON.stringify({ roomCode, playerName, gameType }));
 }
 
 export function clearSession() {
   localStorage.removeItem('bj_session');
 }
 
-export function loadSession(): { roomCode: string; playerName: string } | null {
+export function loadSession(): { roomCode: string; playerName: string; gameType: 'blackjack' | 'roulette' } | null {
   try {
     const raw = localStorage.getItem('bj_session');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed?.roomCode && parsed?.playerName) return parsed;
+    if (parsed?.roomCode && parsed?.playerName) {
+      return {
+        roomCode: parsed.roomCode,
+        playerName: parsed.playerName,
+        gameType: parsed.gameType ?? 'blackjack',
+      };
+    }
   } catch {}
   return null;
 }

@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore } from '../store/gameStore';
-import { playChipClink, playButton } from '../lib/sounds';
+import type { PublicGameState } from '../types';
+import { playChipClink, playButton, playAllIn } from '../lib/sounds';
 
 const MIN_BET = 10;
 const MAX_BET = 1000;
@@ -14,7 +15,8 @@ const CHIPS = [
 ];
 
 export function BetPanel() {
-  const { gameState, roomCode, myId } = useGameStore();
+  const { gameState: _gameState, roomCode, myId } = useGameStore();
+  const gameState = _gameState as PublicGameState | null;
   const [bet, setBet] = useState(0);
   const [inputVal, setInputVal] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,7 +59,7 @@ export function BetPanel() {
 
   const placeBet = (amount: number, allIn = false) => {
     if (amount < MIN_BET || amount > me.balance) return;
-    playButton();
+    if (allIn) playAllIn(); else playButton();
     socket.emit('placeBet', { roomCode, amount, allIn });
     setAndSync(0);
   };
