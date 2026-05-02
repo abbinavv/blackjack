@@ -33,9 +33,7 @@ export interface PublicPlayer {
   isDisconnected: boolean;
 }
 
-/** Blackjack game state — this is the primary type used by existing components */
 export interface PublicGameState {
-  gameType?: 'blackjack';
   roomCode: string;
   phase: GamePhase;
   players: PublicPlayer[];
@@ -48,6 +46,57 @@ export interface PublicGameState {
   turnTimeLeft: number;
   message: string;
   needsReshuffle: boolean;
+}
+
+// ─── Poker types ─────────────────────────────────────────────────────────────
+
+export type PokerPhase = 'waiting' | 'pre-flop' | 'flop' | 'turn' | 'river' | 'showdown';
+
+export interface PokerPublicPlayer {
+  id: string;
+  name: string;
+  balance: number;
+  holeCards: [Card, Card] | null;
+  bet: number;
+  totalBet: number;
+  status: 'active' | 'folded' | 'all-in' | 'sitting-out';
+  isHost: boolean;
+  isConnected: boolean;
+  isDisconnected: boolean;
+  lastWin: number;
+  position: number;
+  handResult?: { name: string; score: number };
+}
+
+export interface PokerPot {
+  amount: number;
+  eligible: string[];
+}
+
+export interface PokerWinner {
+  playerId: string;
+  playerName: string;
+  amount: number;
+  handName: string;
+}
+
+export interface PokerPublicGameState {
+  gameType: 'poker';
+  roomCode: string;
+  phase: PokerPhase;
+  players: PokerPublicPlayer[];
+  communityCards: Card[];
+  pots: PokerPot[];
+  currentBet: number;
+  minRaise: number;
+  activePlayerId: string | null;
+  dealerIndex: number;
+  sbIndex: number;
+  bbIndex: number;
+  round: number;
+  turnTimeLeft: number;
+  message: string;
+  winners: PokerWinner[] | null;
 }
 
 // ─── Roulette types ───────────────────────────────────────────────────────────
@@ -86,5 +135,4 @@ export interface RoulettePublicGameState {
   message: string;
 }
 
-/** Union of all possible game states — use when the game type may be either */
-export type AnyGameState = PublicGameState | RoulettePublicGameState;
+export type AnyGameState = PublicGameState | RoulettePublicGameState | PokerPublicGameState;

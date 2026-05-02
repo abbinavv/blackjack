@@ -17,7 +17,7 @@ export function WaitingRoom() {
   const { gameState: rawState, roomCode, myId, setRoomCode } = useGameStore();
   if (!rawState || !roomCode) return null;
 
-  const isRoulette = (rawState as RoulettePublicGameState).gameType === 'roulette';
+  const isRoulette = (rawState as unknown as RoulettePublicGameState).gameType === 'roulette';
 
   // For blackjack we need wantsSitOut; for roulette we don't have it
   const bjState = isRoulette ? null : rawState as PublicGameState;
