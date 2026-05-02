@@ -1,9 +1,10 @@
 import { Server, Socket } from 'socket.io';
 import { GameRoom } from './game/GameRoom';
+import { RouletteGameRoom } from './game/RouletteGameRoom';
 import { PokerGameRoom } from './game/PokerGameRoom';
-import { Card } from './game/types';
+import { RouletteBet, Card } from './game/types';
 
-type AnyRoom = GameRoom | PokerGameRoom;
+type AnyRoom = GameRoom | RouletteGameRoom | PokerGameRoom;
 
 const rooms = new Map<string, AnyRoom>();
 const playerRoom = new Map<string, string>(); // socketId → roomCode
@@ -34,6 +35,9 @@ export function setupSocketHandlers(io: Server): void {
             io.to(pid).emit('pokerYourCards', cards);
           }
         });
+      } else if (gameType === 'roulette') {
+        room = new RouletteGameRoom(code, socket.id, name, savedBalance);
+        room.on('stateChange', (state) => io.to(code).emit('gameState', state));
       } else {
         room = new GameRoom(code, socket.id, name, savedBalance);
         room.on('stateChange', (state) => io.to(code).emit('gameState', state));
@@ -146,6 +150,29 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
+    // ─── Roulette events ─────────────────────────────────────────────────────
+
+    socket.on('rouletteBet', ({ roomCode, bets }: { roomCode: string; bets: RouletteBet[] }) => {
+      const room = rooms.get(roomCode);
+      if (room instanceof RouletteGameRoom) {
+        if (!room.placeBet(socket.id, bets)) socket.emit('error', 'Invalid bet');
+      }
+    });
+
+    socket.on('rouletteSpin', (roomCode: string) => {
+      const room = rooms.get(roomCode);
+      if (room instanceof RouletteGameRoom) {
+        if (!room.spin(socket.id)) socket.emit('error', 'Only the host can spin');
+      }
+    });
+
+    socket.on('rouletteNextRound', (roomCode: string) => {
+      const room = rooms.get(roomCode);
+      if (room instanceof RouletteGameRoom) {
+        if (!room.nextRound(socket.id)) socket.emit('error', 'Only the host can start a new round');
+      }
+    });
+
     // ─── Poker events ────────────────────────────────────────────────────────
 
     socket.on('pokerFold', (roomCode: string) => {
@@ -221,6 +248,28 @@ export function setupSocketHandlers(io: Server): void {
             io.to(code).emit('gameState', room.getPublicState());
             if (name) io.to(code).emit('toast', `${name} left the game`);
           }
+          playerRoom.delete(socket.id);
+        }
+      } else if (room instanceof RouletteGameRoom) {
+        // Always give a grace period — phone screen locks cause brief disconnects
+        // at any phase, and we never want to immediately drop a roulette player.
+        if (player) {
+          room.markDisconnected(socket.id);
+          io.to(code).emit('gameState', room.getPublicState());
+
+          room.scheduleDisconnectCleanup(socket.id, () => {
+            const r = rooms.get(code);
+            if (!r) return;
+            if (r.isEmpty()) {
+              r.destroy();
+              rooms.delete(code);
+            } else {
+              io.to(code).emit('gameState', r.getPublicState());
+              io.to(code).emit('toast', `${player.name} left the game`);
+            }
+            playerRoom.delete(socket.id);
+          });
+        } else {
           playerRoom.delete(socket.id);
         }
       } else if (room instanceof GameRoom) {
