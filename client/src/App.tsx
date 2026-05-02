@@ -166,6 +166,14 @@ export function App() {
   // ─── Roulette routing ─────────────────────────────────────────────────────
 
   if (roomCode && gameState && (gameState as { gameType?: string }).gameType === 'roulette') {
+    if ((gameState as unknown as { phase: string }).phase === 'waiting') {
+      return (
+        <>
+          <ToastContainer />
+          <WaitingRoom />
+        </>
+      );
+    }
     return (
       <>
         <ToastContainer />
