@@ -275,14 +275,24 @@ export function Table() {
         {/* Controls */}
         <div className="border-t border-white/8 px-3 py-3 flex-shrink-0 flex justify-center"
              style={{ background: 'rgba(0,0,0,0.18)' }}>
-          {gameState.phase === 'betting' && <BetPanel />}
-          {gameState.phase === 'insurance' && <InsurancePanel />}
-          {gameState.phase === 'playing' && <GameControls />}
-          {gameState.phase === 'dealer' && (
-            <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealer playing...</div>
-          )}
-          {gameState.phase === 'dealing' && (
-            <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealing...</div>
+          {/* Mid-game join: show spectator notice until next round */}
+          {me?.isSittingOut && gameState.phase !== 'betting' && gameState.phase !== 'complete' ? (
+            <div className="flex flex-col items-center gap-1 py-2">
+              <div className="text-gold/70 text-sm font-bold tracking-wide">Joined mid-game</div>
+              <div className="text-white/35 text-xs">You'll play from the next round →</div>
+            </div>
+          ) : (
+            <>
+              {gameState.phase === 'betting' && <BetPanel />}
+              {gameState.phase === 'insurance' && <InsurancePanel />}
+              {gameState.phase === 'playing' && <GameControls />}
+              {gameState.phase === 'dealer' && (
+                <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealer playing...</div>
+              )}
+              {gameState.phase === 'dealing' && (
+                <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealing...</div>
+              )}
+            </>
           )}
         </div>
       </div>

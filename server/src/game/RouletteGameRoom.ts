@@ -88,8 +88,9 @@ export class RouletteGameRoom extends EventEmitter {
 
   addPlayer(id: string, name: string, savedBalance?: number): boolean {
     if (this.state.players.length >= 8) return false;
-    if (this.state.phase !== 'waiting') return false;
+    // Allow joining at any phase — new player can bet next round
     this.state.players.push(this.makePlayer(id, name, savedBalance));
+    this.broadcast(`${name} joined`);
     return true;
   }
 
