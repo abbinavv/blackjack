@@ -1,100 +1,35 @@
-import { useState } from 'react';
-import { socket } from '../lib/socket';
-import { useGameStore, loadBalance, saveSession } from '../store/gameStore';
-import { playButton } from '../lib/sounds';
-
 interface LobbyProps {
-  gameType: 'blackjack' | 'roulette';
+  name: string;
+  setName: (n: string) => void;
+  joinCode: string;
+  setJoinCode: (c: string) => void;
+  mode: 'home' | 'join';
+  setMode: (m: 'home' | 'join') => void;
+  loading: boolean;
+  error: string | null;
+  selectedGame: 'blackjack' | 'roulette' | 'poker' | null;
+  onBack: () => void;
+  onCreate: () => void;
+  onJoin: () => void;
 }
 
-export function Lobby({ gameType }: LobbyProps) {
-  const { setMyId, setRoomCode, setPlayerName, setGameType, setError, error } = useGameStore();
-  const [name, setName] = useState('');
-  const [code, setCode] = useState('');
-  const [mode, setMode] = useState<'home' | 'join'>('home');
-  const [loading, setLoading] = useState(false);
-
-  const connect = (cb: () => void) => {
-    if (!socket.connected) {
-      socket.connect();
-      const timeout = setTimeout(() => {
-        socket.off('connect');
-        setLoading(false);
-        setError('Cannot reach server — it may be waking up. Wait 30s and try again.');
-      }, 12000);
-      socket.once('connect', () => {
-        clearTimeout(timeout);
-        setMyId(socket.id!);
-        cb();
-      });
-      socket.once('connect_error', () => {
-        clearTimeout(timeout);
-        setLoading(false);
-        setError('Connection failed. Check your internet and try again.');
-      });
-    } else {
-      cb();
-    }
-  };
-
-  const handleCreate = () => {
-    if (!name.trim()) return setError('Enter your name');
-    setError(null);
-    setLoading(true);
-    playButton();
-    const trimmed = name.trim();
-    const savedBalance = loadBalance(trimmed);
-    connect(() => {
-      socket.emit('createRoom', { name: trimmed, savedBalance, gameType }, (roomCode: string) => {
-        setPlayerName(trimmed);
-        setRoomCode(roomCode);
-        saveSession(roomCode, trimmed, gameType);
-        setLoading(false);
-      });
-    });
-  };
-
-  const handleJoin = () => {
-    if (!name.trim()) return setError('Enter your name');
-    if (code.trim().length !== 4) return setError('Enter a 4-character room code');
-    setError(null);
-    setLoading(true);
-    playButton();
-    const trimmed = name.trim();
-    const roomCode = code.trim().toUpperCase();
-    const savedBalance = loadBalance(trimmed);
-    connect(() => {
-      socket.emit(
-        'joinRoom',
-        { roomCode, name: trimmed, savedBalance },
-        (ok: boolean, err?: string) => {
-          setLoading(false);
-          if (!ok) return setError(err ?? 'Failed to join');
-          setPlayerName(trimmed);
-          setRoomCode(roomCode);
-          saveSession(roomCode, trimmed, gameType);
-        }
-      );
-    });
-  };
-
-  const gameLabel = gameType === 'roulette' ? 'Roulette' : 'Blackjack';
-  const accentColor = gameType === 'roulette' ? 'text-red-400' : 'text-gold';
+export function Lobby({
+  name, setName, joinCode, setJoinCode,
+  mode, setMode, loading, error,
+  selectedGame, onBack, onCreate, onJoin,
+}: LobbyProps) {
+  const gameIcon = selectedGame === 'poker' ? '♣' : selectedGame === 'roulette' ? '🎡' : '♠';
+  const gameLabel = selectedGame === 'poker' ? "Texas Hold'em" : selectedGame === 'roulette' ? 'Roulette' : 'Blackjack';
+  const gameSubtitle = selectedGame === 'poker' ? 'No-Limit Poker' : selectedGame === 'roulette' ? 'European Wheel' : 'Vegas Strip Rules';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4"
          style={{ background: 'radial-gradient(ellipse at 50% 30%, #0d2818 0%, #050d0a 100%)' }}>
 
       <div className="text-center mb-10">
-        <div className="text-5xl mb-3">
-          {gameType === 'roulette' ? '🎡' : '♠'}
-        </div>
-        <h1 className={`font-display text-5xl font-black tracking-tight ${accentColor}`}>
-          {gameLabel}
-        </h1>
-        <p className="text-white/30 text-sm mt-2 tracking-widest uppercase">
-          {gameType === 'roulette' ? 'European Single Zero' : 'Vegas Strip Rules'}
-        </p>
+        <div className="text-6xl mb-3">{gameIcon}</div>
+        <h1 className="font-display text-5xl font-black text-gold tracking-tight">{gameLabel}</h1>
+        <p className="text-white/30 text-sm mt-2 tracking-widest uppercase">{gameSubtitle}</p>
       </div>
 
       <div
@@ -107,7 +42,7 @@ export function Lobby({ gameType }: LobbyProps) {
             type="text"
             value={name}
             onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') mode === 'join' ? handleJoin() : handleCreate(); }}
+            onKeyDown={e => { if (e.key === 'Enter') mode === 'join' ? onJoin() : onCreate(); }}
             placeholder="Enter your name..."
             maxLength={20}
             className="w-full px-4 py-3 rounded-xl text-white placeholder-white/25
@@ -121,9 +56,9 @@ export function Lobby({ gameType }: LobbyProps) {
             <label className="text-xs uppercase tracking-widest text-white/40 mb-1.5 block">Room Code</label>
             <input
               type="text"
-              value={code}
-              onChange={e => setCode(e.target.value.toUpperCase().slice(0, 4))}
-              onKeyDown={e => { if (e.key === 'Enter') handleJoin(); }}
+              value={joinCode}
+              onChange={e => setJoinCode(e.target.value.toUpperCase().slice(0, 4))}
+              onKeyDown={e => { if (e.key === 'Enter') onJoin(); }}
               placeholder="ABCD"
               maxLength={4}
               className="w-full px-4 py-3 rounded-xl text-center text-2xl font-mono font-bold
@@ -140,40 +75,41 @@ export function Lobby({ gameType }: LobbyProps) {
 
         {mode === 'home' ? (
           <div className="space-y-3">
-            <button onClick={handleCreate} disabled={loading} className="btn-primary w-full text-base py-3.5">
+            <button onClick={onCreate} disabled={loading} className="btn-primary w-full text-base py-3.5">
               {loading ? 'Creating...' : '+ Create Room'}
             </button>
-            <button onClick={() => { setMode('join'); setError(null); }} className="btn-ghost w-full text-base py-3.5">
+            <button onClick={() => { setMode('join'); }} className="btn-ghost w-full text-base py-3.5">
               Join Room
             </button>
           </div>
         ) : (
           <div className="space-y-3">
-            <button onClick={handleJoin} disabled={loading} className="btn-primary w-full text-base py-3.5">
+            <button onClick={onJoin} disabled={loading} className="btn-primary w-full text-base py-3.5">
               {loading ? 'Joining...' : 'Join Game'}
             </button>
-            <button onClick={() => { setMode('home'); setCode(''); setError(null); }} className="btn-ghost w-full text-base py-3.5">
+            <button onClick={() => setMode('home')} className="btn-ghost w-full text-base py-3.5">
               ← Back
             </button>
           </div>
         )}
-      </div>
 
-      <div className="mt-6">
-        <button
-          onClick={() => { playButton(); setGameType(null); }}
-          className="text-white/30 text-sm hover:text-white/60 transition-colors flex items-center gap-1.5"
-        >
-          ← Back to Games
+        <button onClick={onBack} className="w-full text-center text-xs text-white/25 hover:text-white/50 transition-colors py-1">
+          ← Change game
         </button>
       </div>
 
-      <div className="mt-6 flex gap-6 text-white/25 text-xs">
-        {gameType === 'roulette' ? (
+      <div className="mt-8 flex gap-6 text-white/25 text-xs">
+        {selectedGame === 'poker' ? (
           <>
-            <span>2–8 Players</span>
-            <span>European 0–36</span>
-            <span>35:1 Straight</span>
+            <span>2–6 Players</span>
+            <span>$10/$20 Blinds</span>
+            <span>NL Hold'em</span>
+          </>
+        ) : selectedGame === 'roulette' ? (
+          <>
+            <span>2–6 Players</span>
+            <span>37 Numbers</span>
+            <span>2.7% Edge</span>
           </>
         ) : (
           <>
