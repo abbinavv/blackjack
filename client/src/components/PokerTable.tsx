@@ -10,48 +10,206 @@ interface PokerTableProps { onLeave: () => void; }
 
 const SUIT_SYMBOLS: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
 const RED_SUITS = new Set(['hearts', 'diamonds']);
-
 type CardSize = 'sm' | 'md' | 'lg';
-const CARD_DIMS: Record<CardSize, [number, number]> = { sm: [26, 38], md: [40, 58], lg: [60, 86] };
+const CARD_DIMS: Record<CardSize, [number, number]> = { sm: [28, 40], md: [44, 63], lg: [68, 98] };
 
 function PokerCard({ card, size = 'sm' }: { card: Card; size?: CardSize }) {
   const [w, h] = CARD_DIMS[size];
   const isRed = RED_SUITS.has(card.suit);
-  const color = isRed ? '#d93535' : '#1a1a1a';
+  const color = isRed ? '#cc2222' : '#111111';
   const sym = SUIT_SYMBOLS[card.suit] ?? '?';
-  const rankFs = size === 'lg' ? 16 : size === 'md' ? 12 : 9;
-  const symFs  = size === 'lg' ? 26 : size === 'md' ? 18 : 13;
-  const r      = size === 'lg' ? 8  : size === 'md' ? 5  : 4;
+  const rankFs = size === 'lg' ? 18 : size === 'md' ? 13 : 10;
+  const symFs  = size === 'lg' ? 30 : size === 'md' ? 21 : 14;
+  const r      = size === 'lg' ? 8  : size === 'md' ? 6  : 4;
+  const pad    = size === 'lg' ? '5px 6px' : size === 'md' ? '3px 4px' : '2px 3px';
 
   return (
     <div style={{
-      width: w, height: h, background: '#fff', borderRadius: r,
-      border: '1px solid rgba(0,0,0,0.18)',
+      width: w, height: h, background: '#ffffff', borderRadius: r,
+      border: '1.5px solid #ccc',
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      padding: size === 'lg' ? '4px 5px' : size === 'md' ? '3px 4px' : '2px 3px',
-      boxShadow: '0 3px 8px rgba(0,0,0,0.5)', flexShrink: 0, userSelect: 'none',
+      padding: pad,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.55)', flexShrink: 0, userSelect: 'none',
     }}>
-      <div style={{ color, fontSize: rankFs, fontWeight: 900, lineHeight: 1 }}>{card.rank}</div>
+      <div style={{ color, fontSize: rankFs, fontWeight: 'bold', lineHeight: 1 }}>{card.rank}</div>
       <div style={{ color, fontSize: symFs, textAlign: 'center', lineHeight: 1 }}>{sym}</div>
-      <div style={{ color, fontSize: rankFs, fontWeight: 900, lineHeight: 1, alignSelf: 'flex-end', transform: 'rotate(180deg)' }}>{card.rank}</div>
+      <div style={{ color, fontSize: rankFs, fontWeight: 'bold', lineHeight: 1, alignSelf: 'flex-end', transform: 'rotate(180deg)' }}>{card.rank}</div>
     </div>
   );
 }
 
 function CardBack({ size = 'sm' }: { size?: CardSize }) {
   const [w, h] = CARD_DIMS[size];
-  const r = size === 'lg' ? 8 : size === 'md' ? 5 : 4;
+  const r = size === 'lg' ? 8 : size === 'md' ? 6 : 4;
   return (
     <div style={{
       width: w, height: h, borderRadius: r,
       background: 'linear-gradient(145deg, #1e40af 0%, #0f1f5c 100%)',
-      border: '1px solid rgba(255,255,255,0.2)',
-      boxShadow: '0 3px 8px rgba(0,0,0,0.5)', flexShrink: 0,
-    }}>
+      border: '1.5px solid rgba(255,255,255,0.25)',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.55)', flexShrink: 0,
+      backgroundImage: 'linear-gradient(145deg, #1e40af 0%, #0f1f5c 100%), repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 10px)',
+    }} />
+  );
+}
+
+// ─── Info modal ───────────────────────────────────────────────────────────────
+
+const HAND_RANKINGS = [
+  { name: 'Royal Flush',    example: 'A K Q J 10 ♠',      pays: 'Best hand',    desc: 'A-K-Q-J-10, all same suit' },
+  { name: 'Straight Flush', example: '9 8 7 6 5 ♥',       pays: 'Pot',          desc: '5 consecutive, same suit' },
+  { name: 'Four of a Kind', example: 'K K K K x',          pays: 'Pot',          desc: '4 cards of the same rank' },
+  { name: 'Full House',     example: 'Q Q Q J J',          pays: 'Pot',          desc: '3 of a kind + a pair' },
+  { name: 'Flush',          example: 'A J 8 4 2 ♦',        pays: 'Pot',          desc: '5 cards, same suit' },
+  { name: 'Straight',       example: '8 7 6 5 4',          pays: 'Pot',          desc: '5 consecutive cards' },
+  { name: 'Three of a Kind',example: '7 7 7 x x',          pays: 'Pot',          desc: '3 cards of the same rank' },
+  { name: 'Two Pair',       example: 'J J 5 5 x',          pays: 'Pot',          desc: 'Two different pairs' },
+  { name: 'One Pair',       example: 'A A x x x',          pays: 'Pot',          desc: '2 cards of the same rank' },
+  { name: 'High Card',      example: 'A K 9 6 2',          pays: 'Pot',          desc: 'Highest card wins' },
+];
+
+function InfoModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+    }} onClick={onClose}>
       <div style={{
-        width: '100%', height: '100%', borderRadius: r - 1,
-        background: 'repeating-linear-gradient(45deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 2px, transparent 2px, transparent 8px)',
-      }} />
+        width: '100%', maxWidth: 520, maxHeight: '88vh',
+        background: '#0d1f14', borderRadius: 16, overflow: 'hidden',
+        border: '1px solid rgba(201,168,76,0.3)',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.7)',
+        display: 'flex', flexDirection: 'column',
+      }} onClick={e => e.stopPropagation()}>
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.07)',
+          flexShrink: 0,
+        }}>
+          <div>
+            <div style={{ color: '#c9a84c', fontWeight: 900, fontSize: 17 }}>How to Play Poker</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginTop: 2 }}>
+              No-Limit Texas Hold'em · $10/$20 Blinds
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: 30, height: 30, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)', fontSize: 16,
+          }}>✕</button>
+        </div>
+
+        <div style={{ overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Game overview */}
+          <div>
+            <div style={{ color: 'rgba(201,168,76,0.7)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 8 }}>
+              How It Works
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 13, lineHeight: 1.6 }}>
+              Each player gets 2 private hole cards. 5 community cards are dealt face-up in rounds
+              (Flop: 3, Turn: 1, River: 1). Make the best 5-card hand using any combo of your 2 cards + 5 community cards.
+            </div>
+          </div>
+
+          {/* Betting rounds */}
+          <div>
+            <div style={{ color: 'rgba(201,168,76,0.7)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 8 }}>
+              Betting Rounds
+            </div>
+            {[
+              { phase: 'Pre-Flop', desc: 'After hole cards are dealt. SB posts $10, BB posts $20 automatically.' },
+              { phase: 'Flop',     desc: '3 community cards revealed. Betting starts left of dealer.' },
+              { phase: 'Turn',     desc: '4th community card revealed. Another round of betting.' },
+              { phase: 'River',    desc: '5th and final community card. Last round of betting.' },
+              { phase: 'Showdown', desc: 'Remaining players reveal cards. Best hand wins the pot.' },
+            ].map(({ phase, desc }) => (
+              <div key={phase} style={{ display: 'flex', gap: 10, marginBottom: 6 }}>
+                <span style={{ color: '#c9a84c', fontWeight: 700, fontSize: 12, minWidth: 60 }}>{phase}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div>
+            <div style={{ color: 'rgba(201,168,76,0.7)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 8 }}>
+              Actions
+            </div>
+            {[
+              { action: 'Check',  desc: 'Pass without betting (only if no one has bet)' },
+              { action: 'Call',   desc: 'Match the current bet' },
+              { action: 'Raise',  desc: 'Increase the current bet (min 1 BB = $20)' },
+              { action: 'All In', desc: 'Bet all your chips' },
+              { action: 'Fold',   desc: 'Give up your hand and forfeit your bet' },
+            ].map(({ action, desc }) => (
+              <div key={action} style={{ display: 'flex', gap: 10, marginBottom: 5 }}>
+                <span style={{ color: '#c9a84c', fontWeight: 700, fontSize: 12, minWidth: 52 }}>{action}</span>
+                <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Hand rankings */}
+          <div>
+            <div style={{ color: 'rgba(201,168,76,0.7)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 8 }}>
+              Hand Rankings (Best → Worst)
+            </div>
+            <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {HAND_RANKINGS.map((h, i) => (
+                <div key={h.name} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+                  background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                  borderBottom: i < HAND_RANKINGS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, minWidth: 14, textAlign: 'right' }}>{i + 1}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: '#e8e8e8', fontSize: 12, fontWeight: 700 }}>{h.name}</div>
+                    <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}>{h.desc}</div>
+                  </div>
+                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, fontFamily: 'monospace' }}>{h.example}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Leave confirmation ───────────────────────────────────────────────────────
+
+function LeaveModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 100,
+      background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }} onClick={onCancel}>
+      <div style={{
+        background: '#111', borderRadius: 16, padding: '28px 32px',
+        border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center', maxWidth: 320,
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>🃏</div>
+        <div style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 6 }}>Leave the table?</div>
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 20, lineHeight: 1.5 }}>
+          You'll fold your current hand and any chips you've bet will stay in the pot.
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={onCancel} style={{
+            flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: 600,
+          }}>Stay</button>
+          <button onClick={onConfirm} style={{
+            flex: 1, padding: '10px', borderRadius: 10, cursor: 'pointer',
+            background: 'rgba(229,57,53,0.2)', border: '1px solid rgba(229,57,53,0.5)',
+            color: '#ef5350', fontSize: 13, fontWeight: 700,
+          }}>Leave</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -62,7 +220,7 @@ function BetChip({ amount }: { amount: number }) {
   return (
     <div style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      minWidth: 36, height: 20, borderRadius: 10, padding: '0 6px',
+      minWidth: 40, height: 20, borderRadius: 10, padding: '0 8px',
       background: 'rgba(201,168,76,0.2)', border: '1px solid rgba(201,168,76,0.5)',
       color: '#c9a84c', fontSize: 10, fontWeight: 700,
     }}>
@@ -92,23 +250,25 @@ interface SeatProps {
 }
 
 function PlayerSeat({ player, isMe, isActive, isDealer, isSB, isBB, showCards, turnTimeLeft }: SeatProps) {
-  const isFolded  = player.status === 'folded';
-  const isAllIn   = player.status === 'all-in';
-  const accentColor = nameColor(player.name);
+  const isFolded = player.status === 'folded';
+  const isAllIn  = player.status === 'all-in';
+  const accent   = nameColor(player.name);
+  const badge    = isDealer ? { bg: '#f5f5f5', color: '#000', text: 'D' }
+                 : isSB     ? { bg: '#2196f3', color: '#fff', text: 'SB' }
+                 : isBB     ? { bg: '#e53935', color: '#fff', text: 'BB' }
+                 : null;
 
-  // Cards to show: opponents always get backs unless showdown; never show my cards here (shown separately)
-  const showOpponentCards = !isMe && showCards && player.holeCards;
+  const opponentCards = !isMe && showCards && player.holeCards;
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-      opacity: isFolded ? 0.3 : 1,
-      transition: 'opacity 0.3s',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+      opacity: isFolded ? 0.28 : 1, transition: 'opacity 0.3s',
     }}>
-      {/* Cards above avatar (opponents only) */}
+      {/* Opponent cards above avatar */}
       {!isMe && (
-        <div style={{ display: 'flex', gap: 3 }}>
-          {showOpponentCards
+        <div style={{ display: 'flex', gap: 3, marginBottom: 2 }}>
+          {opponentCards
             ? player.holeCards!.map((c, i) => <PokerCard key={i} card={c} size="sm" />)
             : <><CardBack size="sm" /><CardBack size="sm" /></>}
         </div>
@@ -116,76 +276,66 @@ function PlayerSeat({ player, isMe, isActive, isDealer, isSB, isBB, showCards, t
 
       {/* Avatar */}
       <div style={{
-        width: 40, height: 40, borderRadius: '50%', background: accentColor,
+        width: 44, height: 44, borderRadius: '50%', background: accent,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, fontWeight: 900, color: '#fff',
-        border: isActive ? '2.5px solid #c9a84c' : '2px solid rgba(255,255,255,0.12)',
-        boxShadow: isActive ? '0 0 12px rgba(201,168,76,0.6)' : '0 2px 6px rgba(0,0,0,0.4)',
+        fontSize: 18, fontWeight: 'bold', color: '#fff',
+        border: isActive ? '3px solid #c9a84c' : '2px solid rgba(255,255,255,0.1)',
+        boxShadow: isActive ? '0 0 16px rgba(201,168,76,0.7)' : '0 2px 8px rgba(0,0,0,0.5)',
         position: 'relative', flexShrink: 0,
       }}>
         {player.name[0]?.toUpperCase()}
-
-        {/* Dealer / SB / BB badges */}
-        {(isDealer || isSB || isBB) && (
+        {badge && (
           <div style={{
-            position: 'absolute', top: -5, right: -5,
-            width: 18, height: 18, borderRadius: '50%',
-            background: isDealer ? '#f5f5f5' : isSB ? '#2196f3' : '#e53935',
-            color: isDealer ? '#000' : '#fff',
-            fontSize: 7, fontWeight: 900,
+            position: 'absolute', top: -6, right: -6,
+            minWidth: 18, height: 18, borderRadius: 9,
+            padding: '0 3px',
+            background: badge.bg, color: badge.color,
+            fontSize: 8, fontWeight: 900,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1.5px solid rgba(0,0,0,0.3)',
-          }}>
-            {isDealer ? 'D' : isSB ? 'SB' : 'BB'}
-          </div>
+            border: '1.5px solid rgba(0,0,0,0.25)',
+          }}>{badge.text}</div>
         )}
-
-        {/* ALL IN badge */}
         {isAllIn && (
           <div style={{
-            position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)',
+            position: 'absolute', bottom: -8, left: '50%', transform: 'translateX(-50%)',
             background: '#e53935', color: '#fff', fontSize: 7, fontWeight: 900,
-            padding: '1px 4px', borderRadius: 3, whiteSpace: 'nowrap',
+            padding: '1px 5px', borderRadius: 3, whiteSpace: 'nowrap',
           }}>ALL IN</div>
         )}
       </div>
 
-      {/* Name */}
-      <div style={{
-        fontSize: 11, fontWeight: isMe ? 700 : 400,
-        color: isMe ? '#c9a84c' : 'rgba(255,255,255,0.8)',
-        maxWidth: 72, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {player.name}{isMe && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 9 }}> (you)</span>}
+      <div style={{ textAlign: 'center', lineHeight: 1.3 }}>
+        <div style={{
+          fontSize: 12, fontWeight: isMe ? 700 : 500,
+          color: isMe ? '#c9a84c' : 'rgba(255,255,255,0.85)',
+          maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {player.name}
+          {isMe && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 9 }}> (you)</span>}
+        </div>
+        <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 700 }}>
+          ${player.balance.toLocaleString()}
+        </div>
       </div>
 
-      {/* Balance */}
-      <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 700 }}>
-        ${player.balance.toLocaleString()}
-      </div>
-
-      {/* Bet */}
       {player.bet > 0 && <BetChip amount={player.bet} />}
 
-      {/* Active timer */}
       {isActive && turnTimeLeft > 0 && (
         <div style={{
-          fontSize: 12, fontWeight: 700,
+          fontSize: 13, fontWeight: 700,
           color: turnTimeLeft <= 5 ? '#e53935' : '#c9a84c',
-          animation: turnTimeLeft <= 5 ? 'pulse 0.5s infinite' : 'none',
         }}>
           {turnTimeLeft}s
         </div>
       )}
 
-      {/* Win result */}
       {player.lastWin > 0 && (
-        <div style={{ fontSize: 11, color: '#4caf50', fontWeight: 700 }}>+${player.lastWin}</div>
+        <div style={{ fontSize: 12, color: '#4caf50', fontWeight: 700 }}>+${player.lastWin}</div>
       )}
       {player.handResult && (
         <div style={{
-          fontSize: 9, color: '#c9a84c', textAlign: 'center',
-          background: 'rgba(201,168,76,0.1)', borderRadius: 3, padding: '1px 4px',
+          fontSize: 10, color: '#c9a84c', textAlign: 'center',
+          background: 'rgba(201,168,76,0.12)', borderRadius: 4, padding: '2px 6px',
         }}>
           {player.handResult.name}
         </div>
@@ -219,87 +369,74 @@ function ActionPanel({ state, me, roomCode }: { state: PokerPublicGameState; me:
 
   return (
     <div style={{
-      flexShrink: 0,
-      padding: '10px 16px 12px',
-      background: 'rgba(0,0,0,0.65)',
-      borderTop: '1px solid rgba(255,255,255,0.07)',
-      backdropFilter: 'blur(8px)',
+      flexShrink: 0, padding: '10px 16px 14px',
+      background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+      borderTop: '1px solid rgba(255,255,255,0.08)',
     }}>
-      <div style={{ maxWidth: 580, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ maxWidth: 600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 9 }}>
 
-        {/* Raise controls */}
         {canRaise && (
           <>
-            {/* Slider row */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>
-                ${minRaiseTotal}
-              </span>
-              <input
-                type="range"
-                min={minRaiseTotal}
-                max={maxRaise}
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>${minRaiseTotal}</span>
+              <input type="range"
+                min={minRaiseTotal} max={maxRaise}
                 step={Math.max(1, Math.floor((maxRaise - minRaiseTotal) / 200))}
                 value={raiseAmt}
                 onChange={e => setRaiseAmt(Number(e.target.value))}
                 style={{ flex: 1, accentColor: '#c9a84c', cursor: 'pointer' }}
               />
-              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', whiteSpace: 'nowrap' }}>
-                ${maxRaise.toLocaleString()}
-              </span>
+              <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', whiteSpace: 'nowrap' }}>${maxRaise.toLocaleString()}</span>
             </div>
-
-            {/* Preset buttons */}
             {presets.length > 0 && (
-              <div style={{ display: 'flex', gap: 5, justifyContent: 'center' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
                 {presets.map(({ label, val }) => (
-                  <button key={label} onClick={() => setRaiseAmt(val)}
-                    style={{
-                      padding: '3px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
-                      background: raiseAmt === val ? 'rgba(201,168,76,0.25)' : 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${raiseAmt === val ? 'rgba(201,168,76,0.5)' : 'rgba(255,255,255,0.12)'}`,
-                      color: raiseAmt === val ? '#c9a84c' : 'rgba(255,255,255,0.55)',
-                    }}>
-                    {label}
-                  </button>
+                  <button key={label} onClick={() => setRaiseAmt(val)} style={{
+                    padding: '3px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 11,
+                    background: raiseAmt === val ? 'rgba(201,168,76,0.25)' : 'rgba(255,255,255,0.07)',
+                    border: `1px solid ${raiseAmt === val ? 'rgba(201,168,76,0.5)' : 'rgba(255,255,255,0.12)'}`,
+                    color: raiseAmt === val ? '#c9a84c' : 'rgba(255,255,255,0.5)',
+                  }}>{label} ${val}</button>
                 ))}
               </div>
             )}
           </>
         )}
 
-        {/* Action buttons */}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-          <button onClick={() => { playButton(); socket.emit('pokerFold', roomCode); }}
-            className="btn-ghost"
-            style={{ padding: '10px 22px', background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.4)', color: '#e57373', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-            Fold
-          </button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button onClick={() => { playButton(); socket.emit('pokerFold', roomCode); }} style={{
+            padding: '11px 24px', borderRadius: 10, cursor: 'pointer',
+            background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.4)',
+            color: '#e57373', fontSize: 14, fontWeight: 700,
+          }}>Fold</button>
 
           {canCheck ? (
-            <button onClick={() => { playButton(); socket.emit('pokerCheck', roomCode); }}
-              style={{ padding: '10px 26px', background: 'rgba(52,152,219,0.15)', border: '1px solid rgba(52,152,219,0.4)', color: '#64b5f6', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Check
-            </button>
+            <button onClick={() => { playButton(); socket.emit('pokerCheck', roomCode); }} style={{
+              padding: '11px 28px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(52,152,219,0.15)', border: '1px solid rgba(52,152,219,0.4)',
+              color: '#64b5f6', fontSize: 14, fontWeight: 700,
+            }}>Check</button>
           ) : (
-            <button onClick={() => { playChipClink(); socket.emit('pokerCall', roomCode); }}
-              style={{ padding: '10px 22px', background: 'rgba(52,152,219,0.15)', border: '1px solid rgba(52,152,219,0.4)', color: '#64b5f6', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Call ${Math.min(toCall, me.balance).toLocaleString()}
-            </button>
+            <button onClick={() => { playChipClink(); socket.emit('pokerCall', roomCode); }} style={{
+              padding: '11px 24px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(52,152,219,0.15)', border: '1px solid rgba(52,152,219,0.4)',
+              color: '#64b5f6', fontSize: 14, fontWeight: 700,
+            }}>Call ${Math.min(toCall, me.balance).toLocaleString()}</button>
           )}
 
           {canRaise && (
-            <button onClick={() => { playChipClink(); socket.emit('pokerRaise', { roomCode, amount: raiseAmt }); }}
-              style={{ padding: '10px 22px', background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.4)', color: '#c9a84c', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              Raise ${raiseAmt.toLocaleString()}
-            </button>
+            <button onClick={() => { playChipClink(); socket.emit('pokerRaise', { roomCode, amount: raiseAmt }); }} style={{
+              padding: '11px 24px', borderRadius: 10, cursor: 'pointer',
+              background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.45)',
+              color: '#c9a84c', fontSize: 14, fontWeight: 700,
+            }}>Raise ${raiseAmt.toLocaleString()}</button>
           )}
 
-          <button onClick={() => { playChipClink(); socket.emit('pokerAllIn', roomCode); }}
-            style={{ padding: '10px 16px', background: 'rgba(229,57,53,0.2)', border: '1px solid rgba(229,57,53,0.5)', color: '#ef5350', borderRadius: 10, fontWeight: 900, fontSize: 13, cursor: 'pointer' }}>
-            ALL IN<br />
-            <span style={{ fontSize: 10, opacity: 0.8 }}>${me.balance.toLocaleString()}</span>
-          </button>
+          <button onClick={() => { playChipClink(); socket.emit('pokerAllIn', roomCode); }} style={{
+            padding: '11px 18px', borderRadius: 10, cursor: 'pointer',
+            background: 'rgba(229,57,53,0.2)', border: '1px solid rgba(229,57,53,0.55)',
+            color: '#ef5350', fontSize: 14, fontWeight: 900,
+          }}>ALL IN ${me.balance.toLocaleString()}</button>
         </div>
       </div>
     </div>
@@ -310,6 +447,9 @@ function ActionPanel({ state, me, roomCode }: { state: PokerPublicGameState; me:
 
 export function PokerTable({ onLeave }: PokerTableProps) {
   const { pokerGameState, roomCode, myId, pokerMyCards } = useGameStore();
+  const [showInfo, setShowInfo] = useState(false);
+  const [showLeave, setShowLeave] = useState(false);
+
   if (!pokerGameState || !roomCode) return null;
 
   const state = pokerGameState;
@@ -326,61 +466,73 @@ export function PokerTable({ onLeave }: PokerTableProps) {
     window.location.reload();
   };
 
-  // ── Oval geometry ──
-  const ovalW = Math.min(typeof window !== 'undefined' ? window.innerWidth - 120 : 560, 600);
-  const ovalH = Math.round(ovalW * 0.48);
-  const padX  = 90;   // horizontal space outside oval for seats
-  const padY  = 80;   // vertical space outside oval for seats
+  // ── Oval geometry — fills most of the viewport ──
+  const vw = typeof window !== 'undefined' ? window.innerWidth  : 1200;
+  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const ovalW  = Math.min(Math.round(vw * 0.72), 920);
+  const ovalH  = Math.min(Math.round(ovalW * 0.47), Math.round(vh * 0.44));
+  const padX   = Math.round(ovalW * 0.14);   // seat space left/right of oval
+  const padY   = Math.round(ovalH * 0.55);   // seat space above/below oval
   const canvasW = ovalW + padX * 2;
-  const canvasH = ovalH + padY * 2 + 100; // +100 for my cards below
+  const canvasH = ovalH + padY * 2 + CARD_DIMS['lg'][1] + 10;
 
   const cx = canvasW / 2;
-  const cy = padY + ovalH / 2;  // oval center y
-  const rx = ovalW / 2 - 10;
+  const cy = padY + ovalH / 2;
+  const rx = ovalW / 2 - 12;
   const ry = ovalH / 2 - 8;
 
   const seats = state.players;
   const n = seats.length;
   const myIndex = seats.findIndex(p => p.id === myId);
-  const angleStep = (2 * Math.PI) / n;
 
   const seatPositions = seats.map((_, i) => {
     const offset = i - (myIndex >= 0 ? myIndex : 0);
-    const angle = (Math.PI / 2) + offset * angleStep; // bottom = π/2
-    return {
-      x: cx + rx * Math.cos(angle),
-      y: cy + ry * Math.sin(angle),
-    };
+    const angle = Math.PI / 2 + offset * ((2 * Math.PI) / Math.max(n, 1));
+    return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
   });
 
   return (
     <div style={{
       height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      background: 'radial-gradient(ellipse at 50% 30%, #0e1a0e 0%, #080d08 100%)',
+      background: 'radial-gradient(ellipse at 50% 25%, #0f1e0f 0%, #070d07 100%)',
     }}>
+      {showInfo  && <InfoModal  onClose={() => setShowInfo(false)} />}
+      {showLeave && <LeaveModal onConfirm={handleLeave} onCancel={() => setShowLeave(false)} />}
 
       {/* ── Top bar ── */}
       <div style={{
         flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', height: 44,
+        padding: '0 14px', height: 44,
         background: 'rgba(0,0,0,0.7)', borderBottom: '1px solid rgba(255,255,255,0.07)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#c9a84c', fontWeight: 900, fontSize: 15, letterSpacing: '0.03em' }}>♣ Poker</span>
+        {/* Left */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ color: '#c9a84c', fontWeight: 900, fontSize: 14 }}>♣ Poker</span>
           <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
-          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#c9a84c', letterSpacing: '0.2em', fontSize: 13 }}>{roomCode}</span>
+          <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#c9a84c', letterSpacing: '0.18em', fontSize: 13 }}>{roomCode}</span>
           <span style={{ color: 'rgba(255,255,255,0.15)' }}>|</span>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>R{state.round}</span>
+          {/* Info button */}
+          <button onClick={() => setShowInfo(true)} style={{
+            width: 22, height: 22, borderRadius: '50%', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.2)',
+            color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 900,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>i</button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)' }}>
-            {state.message}
-          </span>
+
+        {/* Center message */}
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          {state.message}
+        </div>
+
+        {/* Right */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {me && <span style={{ fontSize: 13, color: '#4caf50', fontWeight: 700 }}>${me.balance.toLocaleString()}</span>}
-          <button onClick={handleLeave} style={{
+          <button onClick={() => setShowLeave(true)} style={{
             padding: '5px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12,
-            background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.5)',
+            background: 'rgba(229,57,53,0.12)', border: '1px solid rgba(229,57,53,0.35)',
+            color: '#e57373', fontWeight: 600,
           }}>Leave</button>
         </div>
       </div>
@@ -395,24 +547,23 @@ export function PokerTable({ onLeave }: PokerTableProps) {
             left: padX, top: padY,
             width: ovalW, height: ovalH,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse at 42% 38%, #1e6b30 0%, #0f3d1a 55%, #071f0d 100%)',
-            border: '7px solid #7a5a0a',
-            boxShadow: '0 0 0 2px #4a3606, 0 8px 32px rgba(0,0,0,0.6), inset 0 0 50px rgba(0,0,0,0.35)',
+            background: 'radial-gradient(ellipse at 40% 36%, #206830 0%, #0f3d1a 52%, #071e0d 100%)',
+            border: '8px solid #7a5a0a',
+            boxShadow: '0 0 0 2.5px #4a3606, 0 12px 48px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.35)',
           }} />
 
           {/* Community cards */}
           <div style={{
             position: 'absolute',
-            left: '50%', top: padY + ovalH / 2 - 33,
+            left: '50%', top: padY + ovalH / 2 - CARD_DIMS['md'][1] / 2 - 8,
             transform: 'translateX(-50%)',
-            display: 'flex', gap: 5, alignItems: 'center',
+            display: 'flex', gap: 6, alignItems: 'center',
           }}>
             {state.communityCards.map((c, i) => <PokerCard key={i} card={c} size="md" />)}
             {Array.from({ length: 5 - state.communityCards.length }).map((_, i) => (
               <div key={i} style={{
-                width: 40, height: 58, borderRadius: 5,
-                border: '1px dashed rgba(255,255,255,0.12)',
-                background: 'rgba(0,0,0,0.18)',
+                width: CARD_DIMS['md'][0], height: CARD_DIMS['md'][1], borderRadius: 6,
+                border: '1px dashed rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.15)',
               }} />
             ))}
           </div>
@@ -420,14 +571,13 @@ export function PokerTable({ onLeave }: PokerTableProps) {
           {/* Pot */}
           {totalPot > 0 && (
             <div style={{
-              position: 'absolute',
-              left: '50%', top: padY + ovalH / 2 + 34,
+              position: 'absolute', left: '50%',
+              top: padY + ovalH / 2 + CARD_DIMS['md'][1] / 2 + 4,
               transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-              borderRadius: 20, padding: '4px 16px',
-              color: '#c9a84c', fontWeight: 900, fontSize: 14,
-              border: '1px solid rgba(201,168,76,0.35)',
-              whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              background: 'rgba(0,0,0,0.65)', borderRadius: 20, padding: '5px 18px',
+              color: '#c9a84c', fontWeight: 900, fontSize: 15,
+              border: '1px solid rgba(201,168,76,0.4)',
+              whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.6)',
             }}>
               POT: ${totalPot.toLocaleString()}
             </div>
@@ -437,16 +587,14 @@ export function PokerTable({ onLeave }: PokerTableProps) {
           {seats.map((player, i) => {
             const pos = seatPositions[i];
             if (!pos) return null;
-            const isMe = player.id === myId;
             return (
               <div key={player.id} style={{
-                position: 'absolute',
-                left: pos.x, top: pos.y,
+                position: 'absolute', left: pos.x, top: pos.y,
                 transform: 'translate(-50%, -50%)',
               }}>
                 <PlayerSeat
                   player={player}
-                  isMe={isMe}
+                  isMe={player.id === myId}
                   isActive={player.id === state.activePlayerId}
                   isDealer={i === state.dealerIndex}
                   isSB={i === state.sbIndex}
@@ -458,32 +606,30 @@ export function PokerTable({ onLeave }: PokerTableProps) {
             );
           })}
 
-          {/* My hole cards — centered below my seat, at bottom of canvas */}
+          {/* My hole cards — large, bottom-center of canvas */}
           {myCards && (
             <div style={{
-              position: 'absolute',
-              left: '50%',
-              bottom: 4,
+              position: 'absolute', bottom: 2, left: '50%',
               transform: 'translateX(-50%)',
-              display: 'flex', gap: 10,
+              display: 'flex', gap: 12,
             }}>
               {myCards.map((c, i) => <PokerCard key={i} card={c} size="lg" />)}
             </div>
           )}
 
-          {/* Showdown winners banner */}
+          {/* Showdown winners */}
           {state.phase === 'showdown' && state.winners && state.winners.length > 0 && (
             <div style={{
-              position: 'absolute',
-              left: '50%', top: padY + ovalH / 2 - 68,
+              position: 'absolute', left: '50%',
+              top: padY + ovalH / 2 - CARD_DIMS['md'][1] / 2 - 36,
               transform: 'translateX(-50%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
             }}>
               {state.winners.map((w, i) => (
                 <div key={i} style={{
-                  background: 'rgba(76,175,80,0.25)', border: '1px solid rgba(76,175,80,0.5)',
-                  borderRadius: 8, padding: '4px 14px',
-                  color: '#81c784', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                  background: 'rgba(76,175,80,0.22)', border: '1px solid rgba(76,175,80,0.5)',
+                  borderRadius: 8, padding: '5px 16px',
+                  color: '#81c784', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                 }}>
                   🏆 {w.playerName} wins ${w.amount.toLocaleString()} — {w.handName}
                 </div>
@@ -495,22 +641,15 @@ export function PokerTable({ onLeave }: PokerTableProps) {
 
       {/* ── Bottom controls ── */}
       <div style={{ flexShrink: 0 }}>
-        {isMyTurn && me && (
-          <ActionPanel state={state} me={me} roomCode={roomCode} />
-        )}
+        {isMyTurn && me && <ActionPanel state={state} me={me} roomCode={roomCode} />}
 
         {state.phase === 'showdown' && (
-          <div style={{ padding: '10px', textAlign: 'center', background: 'rgba(0,0,0,0.5)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {isHost ? (
-              <button onClick={() => { playButton(); socket.emit('pokerNextRound', roomCode); }}
-                className="btn-primary" style={{ padding: '10px 32px', fontSize: 14 }}>
-                Next Hand →
-              </button>
-            ) : (
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
-                Waiting for host to start next hand...
-              </div>
-            )}
+          <div style={{ padding: '10px', textAlign: 'center', background: 'rgba(0,0,0,0.55)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            {isHost
+              ? <button onClick={() => { playButton(); socket.emit('pokerNextRound', roomCode); }}
+                  className="btn-primary" style={{ padding: '10px 36px', fontSize: 14 }}>Next Hand →</button>
+              : <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>Waiting for host to start next hand...</div>
+            }
           </div>
         )}
 
@@ -518,7 +657,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
           <div style={{
             padding: '8px', textAlign: 'center', fontSize: 12,
             color: 'rgba(255,255,255,0.3)',
-            background: 'rgba(0,0,0,0.4)', borderTop: '1px solid rgba(255,255,255,0.05)',
+            background: 'rgba(0,0,0,0.45)', borderTop: '1px solid rgba(255,255,255,0.05)',
           }}>
             {state.players.find(p => p.id === state.activePlayerId)?.name}'s turn...
           </div>
