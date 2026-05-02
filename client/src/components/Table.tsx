@@ -218,14 +218,16 @@ export function Table() {
       {/* Felt table */}
       <div className="flex-1 flex flex-col felt-table mx-2 my-2 rounded-2xl overflow-hidden min-h-0">
 
-        {/* Message */}
-        <div className="text-center py-1.5 text-xs tracking-widest text-white/40 uppercase border-b border-white/5 flex-shrink-0">
+        {/* Message bar */}
+        <div className="text-center py-1.5 text-xs tracking-[0.18em] text-white/35 uppercase border-b border-white/5 flex-shrink-0"
+             style={{ background: 'rgba(0,0,0,0.12)' }}>
           {gameState.message}
         </div>
 
         {/* Other players — compact pill row at top */}
         {others.length > 0 && (
-          <div className="flex-shrink-0 border-b border-white/5 px-2 py-1.5">
+          <div className="flex-shrink-0 border-b border-white/5 px-2 py-1.5"
+               style={{ background: 'rgba(0,0,0,0.1)' }}>
             <div className="flex gap-2 justify-center flex-wrap">
               {gameState.players.map((player, i) => {
                 if (player.id === myId) return null;
@@ -248,14 +250,14 @@ export function Table() {
         <div className="flex-1 flex flex-col items-center justify-center py-3 px-2 min-h-0">
           <DealerArea gameState={gameState} />
 
-          {/* Divider */}
-          <div className="flex items-center gap-2 w-full max-w-sm opacity-20 my-3">
-            <div className="flex-1 h-px bg-white/30" />
-            <div className="w-1.5 h-1.5 rounded-full bg-white/50" />
-            <div className="flex-1 h-px bg-white/30" />
+          {/* Divider — gold rule with center diamond */}
+          <div className="flex items-center gap-2 w-full max-w-xs my-3" style={{ opacity: 0.28 }}>
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(to right, transparent, rgba(201,168,76,0.7))' }} />
+            <div className="w-1.5 h-1.5 rotate-45 bg-gold/70" />
+            <div className="flex-1 h-px" style={{ background: 'linear-gradient(to left, transparent, rgba(201,168,76,0.7))' }} />
           </div>
 
-          {/* My seat — prominent, centered, full cards */}
+          {/* My seat */}
           {me && myIndex !== -1 && (
             <div className="flex justify-center">
               <PlayerSeat
@@ -271,15 +273,16 @@ export function Table() {
         </div>
 
         {/* Controls */}
-        <div className="border-t border-white/8 px-3 py-3 flex-shrink-0 flex justify-center">
+        <div className="border-t border-white/8 px-3 py-3 flex-shrink-0 flex justify-center"
+             style={{ background: 'rgba(0,0,0,0.18)' }}>
           {gameState.phase === 'betting' && <BetPanel />}
           {gameState.phase === 'insurance' && <InsurancePanel />}
           {gameState.phase === 'playing' && <GameControls />}
           {gameState.phase === 'dealer' && (
-            <div className="text-white/40 text-sm animate-pulse py-2">Dealer is playing...</div>
+            <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealer playing...</div>
           )}
           {gameState.phase === 'dealing' && (
-            <div className="text-white/40 text-sm animate-pulse py-2">Dealing cards...</div>
+            <div className="text-white/40 text-sm animate-pulse py-2 tracking-wider">Dealing...</div>
           )}
         </div>
       </div>

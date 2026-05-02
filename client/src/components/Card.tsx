@@ -20,7 +20,6 @@ export function Card({ card, animate = true, small = false }: Props) {
   const prevFaceUp = useRef(card.faceUp);
   const [flipping, setFlipping] = useState(false);
 
-  // Flip animation: face-down → face-up
   useEffect(() => {
     if (!prevFaceUp.current && card.faceUp) {
       playCardFlip();
@@ -32,7 +31,6 @@ export function Card({ card, animate = true, small = false }: Props) {
     prevFaceUp.current = card.faceUp;
   }, [card.faceUp]);
 
-  // Deal-in animation for new cards
   useEffect(() => {
     if (!animate) return;
     const el = ref.current;
@@ -43,9 +41,7 @@ export function Card({ card, animate = true, small = false }: Props) {
   }, [animate]);
 
   if (!card.faceUp) {
-    return (
-      <div ref={ref} className={`playing-card face-down ${small ? 'small' : ''}`} />
-    );
+    return <div ref={ref} className={`playing-card face-down ${small ? 'small' : ''}`} />;
   }
 
   return (
@@ -53,14 +49,19 @@ export function Card({ card, animate = true, small = false }: Props) {
       ref={ref}
       className={`playing-card ${flipping ? 'animate-flipCard' : animate ? 'animate-dealIn' : ''} ${small ? 'small' : ''}`}
     >
+      {/* Top-left corner: rank + suit symbol */}
       <div className={`card-rank-suit ${suitClass}`}>
         <div>{card.rank}</div>
-        <div style={{ fontSize: 10 }}>{symbol}</div>
+        <div className="suit-tiny">{symbol}</div>
       </div>
+
+      {/* Large center symbol */}
       <div className={`card-center-suit ${suitClass}`}>{symbol}</div>
+
+      {/* Bottom-right corner: rank + suit, rotated */}
       <div className={`card-rank-suit bottom ${suitClass}`}>
         <div>{card.rank}</div>
-        <div style={{ fontSize: 10 }}>{symbol}</div>
+        <div className="suit-tiny">{symbol}</div>
       </div>
     </div>
   );
