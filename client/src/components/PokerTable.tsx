@@ -493,30 +493,31 @@ export function PokerTable({ onLeave }: PokerTableProps) {
   const { pokerGameState, roomCode, myId, pokerMyCards } = useGameStore();
   const [showInfo, setShowInfo] = useState(false);
   const [showLeave, setShowLeave] = useState(false);
+  // Hooks must come before any conditional return
+  const playerName = useGameStore(s => s.playerName);
+  const me = pokerGameState?.players.find(p => p.id === myId);
+
+  useEffect(() => {
+    if (pokerGameState?.phase === 'showdown' && me && playerName) {
+      saveBalance(playerName, me.balance);
+    }
+  }, [pokerGameState?.phase, me?.balance, playerName]);
 
   if (!pokerGameState || !roomCode) return null;
 
+  // pokerGameState narrowed to non-null after the guard
   const state = pokerGameState;
-  const me = state.players.find(p => p.id === myId);
   const isMyTurn = state.activePlayerId === myId && me?.status === 'active';
   const isHost = me?.isHost ?? false;
   const showCards = state.phase === 'showdown';
   const totalPot = state.pots.reduce((s, p) => s + p.amount, 0);
   const myCards = pokerMyCards ?? (showCards ? me?.holeCards ?? null : null);
 
-  const playerName = useGameStore(s => s.playerName);
-
-  useEffect(() => {
-    if (state.phase === 'showdown' && me && playerName) {
-      saveBalance(playerName, me.balance);
-    }
-  }, [state.phase, me?.balance, playerName]);
-
   const handleLeave = () => {
     if (me && playerName) saveBalance(playerName, me.balance);
-    clearSession(); socket.disconnect(); onLeave();
+    clearSession(); socket.disconnect();
     useGameStore.setState({ gameState: null, pokerMyCards: null });
-    window.location.reload();
+    onLeave(); // App.handleLeave handles state cleanup + reload
   };
 
   // ── Oval geometry — fills most of the viewport ──

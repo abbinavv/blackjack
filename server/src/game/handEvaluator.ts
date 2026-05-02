@@ -69,7 +69,8 @@ function evaluate5(hand: Card[]): HandResult {
   const pack = (arr: number[]) => arr.reduce((acc, v, i) => acc + v * Math.pow(15, 4 - i), 0);
 
   if (isStraight && isFlush) {
-    return { rank: 8, score: 8e10 + straightHigh, name: HAND_NAMES[8], bestCards: hand };
+    const name = straightHigh === 14 ? 'Royal Flush' : HAND_NAMES[8];
+    return { rank: 8, score: 8e10 + straightHigh, name, bestCards: hand };
   }
 
   if (groups[0].c === 4) {

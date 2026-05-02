@@ -5,7 +5,7 @@ import { RoulettePublicGameState, RouletteBet } from '../types';
 import { RouletteWheel } from './RouletteWheel';
 import { RouletteBetBoard } from './RouletteBetBoard';
 import { ToastContainer } from './Toast';
-import { playButton } from '../lib/sounds';
+import { playButton, playWin, playLose } from '../lib/sounds';
 
 // ── Dynamic layout calculation ────────────────────────────────────────────────
 // Adapts cell sizes, panel widths to any landscape window — no hardcoded breakpoints
@@ -144,30 +144,37 @@ export function RouletteTable() {
   const layout = useLayout();
   const isPortrait = useIsPortrait();
 
-  if (!state || !roomCode) return null;
-
-  // Portrait → ask to rotate
-  if (isPortrait) return <RotatePrompt />;
-
-  const me = state.players.find(p => p.id === myId);
-  const isHost = me?.isHost ?? false;
+  // Derive before early return so hooks are never called conditionally
+  const me = state?.players.find(p => p.id === myId);
 
   useEffect(() => {
+    if (!state) return;
     if (state.phase === 'complete' && state.spinResult !== null && prevPhase.current === 'spinning') {
       setHistory(h => [state.spinResult!, ...h].slice(0, 20));
     }
     if (state.phase === 'betting') { setBetsSubmitted(false); setPendingBets([]); }
     prevPhase.current = state.phase;
-  }, [state.phase, state.spinResult]);
+  }, [state?.phase, state?.spinResult]);
 
   useEffect(() => {
-    if (state.phase === 'complete' && me && playerName) saveBalance(playerName, me.balance);
-  }, [state.phase]);
+    if (state?.phase === 'complete' && me && playerName) {
+      saveBalance(playerName, me.balance);
+      if (me.lastWin > 0) playWin();
+      else if (me.lastWin < 0) playLose();
+    }
+  }, [state?.phase]);
 
   const handleBetsChange = useCallback((bets: RouletteBet[]) => {
     setPendingBets(bets);
     setBetsSubmitted(false);
   }, []);
+
+  if (!state || !roomCode) return null;
+
+  // Portrait → ask to rotate
+  if (isPortrait) return <RotatePrompt />;
+
+  const isHost = me?.isHost ?? false;
 
   const confirmBets = () => {
     playButton();

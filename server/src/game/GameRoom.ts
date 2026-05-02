@@ -511,8 +511,9 @@ export class GameRoom extends EventEmitter {
     if (!player || player.id !== playerId) return false;
     const hand = this.getCurrentActiveHand();
     if (!hand || !canSplit(hand)) return false;
-    if (player.balance < hand.bet) return false;
     if (player.hands.length >= 4) return false;
+    // Player must be able to cover all resulting hands if they all lose
+    if (player.balance < hand.bet * (player.hands.length + 1)) return false;
 
     const card2 = hand.cards.pop()!;
     const newHand = makeHand([card2], hand.bet, true);

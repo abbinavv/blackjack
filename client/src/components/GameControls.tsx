@@ -10,7 +10,7 @@ function canDoubleHand(hand: PublicPlayerHand, balance: number): boolean {
 function canSplitHand(hand: PublicPlayerHand, balance: number, totalHands: number): boolean {
   if (hand.cards.length !== 2) return false;
   if (totalHands >= 4) return false;
-  if (balance < hand.bet) return false;
+  if (balance < hand.bet * (totalHands + 1)) return false;
   const v = (r: string) => ['J','Q','K'].includes(r) ? 10 : r === 'A' ? 11 : parseInt(r, 10);
   return v(hand.cards[0].rank) === v(hand.cards[1].rank);
 }
