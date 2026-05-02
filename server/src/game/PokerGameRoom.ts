@@ -209,6 +209,9 @@ export class PokerGameRoom extends EventEmitter {
   getPlayer(id: string): PokerPlayerInternal | undefined {
     return this.state.players.find(p => p.id === id);
   }
+  getPlayerHoleCards(id: string): [Card, Card] | null {
+    return this.getPlayer(id)?.holeCards ?? null;
+  }
   isHost(id: string): boolean { return this.getPlayer(id)?.isHost ?? false; }
   isEmpty(): boolean { return this.state.players.length === 0; }
   getPlayerCount(): number { return this.state.players.length; }
@@ -738,12 +741,11 @@ export class PokerGameRoom extends EventEmitter {
     this.showdownTimeout = setTimeout(() => {
       this.showdownTimeout = null;
       const activePlayers = this.state.players.filter(p => p.status !== 'sitting-out');
-      if (activePlayers.length >= 2) {
-        // Auto-start next hand
-      } else {
+      if (activePlayers.length < 2) {
         this.state.phase = 'waiting';
         this.broadcastState('Waiting for players...');
       }
+      // else: stay in showdown — host clicks "Next Hand" to continue
     }, SHOWDOWN_DELAY_MS) as unknown as NodeJS.Timeout;
   }
 

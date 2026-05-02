@@ -89,16 +89,10 @@ export function setupSocketHandlers(io: Server): void {
       io.to(roomCode).emit('gameState', room.getPublicState());
       io.to(roomCode).emit('toast', `${name} reconnected`);
 
-      // Re-send private cards on rejoin
+      // Re-send private hole cards on rejoin (public state hides them during play)
       if (room instanceof PokerGameRoom) {
-        const player = room.getPlayer(socket.id);
-        if (player) {
-          const state = room.getPublicState();
-          const publicPlayer = state.players.find(p => p.id === socket.id);
-          if (publicPlayer?.holeCards) {
-            socket.emit('pokerYourCards', publicPlayer.holeCards);
-          }
-        }
+        const holeCards = room.getPlayerHoleCards(socket.id);
+        if (holeCards) socket.emit('pokerYourCards', holeCards);
       }
     });
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
-import { useGameStore, clearSession } from '../store/gameStore';
+import { useGameStore, clearSession, saveBalance } from '../store/gameStore';
 import { PokerPublicGameState, PokerPublicPlayer, Card } from '../types';
 import { playButton, playChipClink } from '../lib/sounds';
 
@@ -11,44 +11,84 @@ interface PokerTableProps { onLeave: () => void; }
 const SUIT_SYMBOLS: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' };
 const RED_SUITS = new Set(['hearts', 'diamonds']);
 type CardSize = 'sm' | 'md' | 'lg';
-const CARD_DIMS: Record<CardSize, [number, number]> = { sm: [28, 40], md: [44, 63], lg: [68, 98] };
+const CARD_DIMS: Record<CardSize, [number, number]> = { sm: [30, 44], md: [46, 66], lg: [70, 100] };
 
+// Realistic casino-quality card — matches blackjack Card.tsx styling
 function PokerCard({ card, size = 'sm' }: { card: Card; size?: CardSize }) {
   const [w, h] = CARD_DIMS[size];
   const isRed = RED_SUITS.has(card.suit);
-  const color = isRed ? '#cc2222' : '#111111';
+  const color = isRed ? '#C8102E' : '#111111';
   const sym = SUIT_SYMBOLS[card.suit] ?? '?';
-  const rankFs = size === 'lg' ? 18 : size === 'md' ? 13 : 10;
-  const symFs  = size === 'lg' ? 30 : size === 'md' ? 21 : 14;
-  const r      = size === 'lg' ? 8  : size === 'md' ? 6  : 4;
-  const pad    = size === 'lg' ? '5px 6px' : size === 'md' ? '3px 4px' : '2px 3px';
+
+  const r             = size === 'lg' ? 7  : size === 'md' ? 6  : 4;
+  const cornerRankFs  = size === 'lg' ? 16 : size === 'md' ? 12 : 8;
+  const cornerSuitFs  = size === 'lg' ? 11 : size === 'md' ? 8  : 5.5;
+  const centerFs      = size === 'lg' ? 32 : size === 'md' ? 22 : 13;
+  const cornerPad     = size === 'lg' ? '4px 5px' : size === 'md' ? '3px 4px' : '2px 3px';
 
   return (
     <div style={{
-      width: w, height: h, background: '#ffffff', borderRadius: r,
-      border: '1.5px solid #ccc',
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      padding: pad,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.55)', flexShrink: 0, userSelect: 'none',
+      width: w, height: h,
+      background: 'linear-gradient(145deg, #ffffff 0%, #f9f7f3 100%)',
+      borderRadius: r,
+      border: '1px solid #c8c0b4',
+      position: 'relative', overflow: 'hidden', flexShrink: 0, userSelect: 'none',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.15), 0 4px 12px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.85)',
     }}>
-      <div style={{ color, fontSize: rankFs, fontWeight: 'bold', lineHeight: 1 }}>{card.rank}</div>
-      <div style={{ color, fontSize: symFs, textAlign: 'center', lineHeight: 1 }}>{sym}</div>
-      <div style={{ color, fontSize: rankFs, fontWeight: 'bold', lineHeight: 1, alignSelf: 'flex-end', transform: 'rotate(180deg)' }}>{card.rank}</div>
+      {/* Top-left corner: rank + suit */}
+      <div style={{
+        position: 'absolute', top: 0, left: 0, padding: cornerPad,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1,
+        color, fontFamily: 'Georgia, "Playfair Display", serif',
+      }}>
+        <span style={{ fontSize: cornerRankFs, fontWeight: 700 }}>{card.rank}</span>
+        <span style={{ fontSize: cornerSuitFs, marginTop: -1 }}>{sym}</span>
+      </div>
+
+      {/* Large center symbol */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color, fontSize: centerFs,
+        filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.1))',
+      }}>{sym}</div>
+
+      {/* Bottom-right corner: rank + suit, rotated */}
+      <div style={{
+        position: 'absolute', bottom: 0, right: 0, padding: cornerPad,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1,
+        color, fontFamily: 'Georgia, "Playfair Display", serif',
+        transform: 'rotate(180deg)',
+      }}>
+        <span style={{ fontSize: cornerRankFs, fontWeight: 700 }}>{card.rank}</span>
+        <span style={{ fontSize: cornerSuitFs, marginTop: -1 }}>{sym}</span>
+      </div>
     </div>
   );
 }
 
+// Casino-back card — navy with gold border frame
 function CardBack({ size = 'sm' }: { size?: CardSize }) {
   const [w, h] = CARD_DIMS[size];
-  const r = size === 'lg' ? 8 : size === 'md' ? 6 : 4;
+  const r     = size === 'lg' ? 7 : size === 'md' ? 6 : 4;
+  const inset = size === 'lg' ? 3 : size === 'md' ? 2.5 : 2;
+
   return (
     <div style={{
-      width: w, height: h, borderRadius: r,
-      background: 'linear-gradient(145deg, #1e40af 0%, #0f1f5c 100%)',
-      border: '1.5px solid rgba(255,255,255,0.25)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.55)', flexShrink: 0,
-      backgroundImage: 'linear-gradient(145deg, #1e40af 0%, #0f1f5c 100%), repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 2px, transparent 2px, transparent 10px)',
-    }} />
+      width: w, height: h, borderRadius: r, flexShrink: 0, position: 'relative', overflow: 'hidden',
+      background: '#0c1854',
+      backgroundImage: 'repeating-conic-gradient(rgba(255,255,255,0.045) 0deg 90deg, rgba(255,255,255,0.018) 90deg 180deg) 0 0 / 8px 8px',
+      border: '1.5px solid #c9a84c',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.45)',
+    }}>
+      {/* Inner gold frame */}
+      <div style={{
+        position: 'absolute',
+        top: inset, left: inset, right: inset, bottom: inset,
+        border: '1px solid rgba(201,168,76,0.42)',
+        borderRadius: Math.max(2, r - 2),
+      }} />
+    </div>
   );
 }
 
@@ -276,12 +316,16 @@ function PlayerSeat({ player, isMe, isActive, isDealer, isSB, isBB, showCards, t
 
       {/* Avatar */}
       <div style={{
-        width: 44, height: 44, borderRadius: '50%', background: accent,
+        width: 46, height: 46, borderRadius: '50%',
+        background: `radial-gradient(circle at 35% 35%, ${accent}dd, ${accent}88)`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 18, fontWeight: 'bold', color: '#fff',
-        border: isActive ? '3px solid #c9a84c' : '2px solid rgba(255,255,255,0.1)',
-        boxShadow: isActive ? '0 0 16px rgba(201,168,76,0.7)' : '0 2px 8px rgba(0,0,0,0.5)',
+        border: isActive ? '3px solid #c9a84c' : '2px solid rgba(255,255,255,0.12)',
+        boxShadow: isActive
+          ? '0 0 20px rgba(201,168,76,0.8), 0 0 6px rgba(201,168,76,0.4)'
+          : '0 2px 10px rgba(0,0,0,0.6)',
         position: 'relative', flexShrink: 0,
+        transition: 'box-shadow 0.3s, border-color 0.3s',
       }}>
         {player.name[0]?.toUpperCase()}
         {badge && (
@@ -460,7 +504,16 @@ export function PokerTable({ onLeave }: PokerTableProps) {
   const totalPot = state.pots.reduce((s, p) => s + p.amount, 0);
   const myCards = pokerMyCards ?? (showCards ? me?.holeCards ?? null : null);
 
+  const playerName = useGameStore(s => s.playerName);
+
+  useEffect(() => {
+    if (state.phase === 'showdown' && me && playerName) {
+      saveBalance(playerName, me.balance);
+    }
+  }, [state.phase, me?.balance, playerName]);
+
   const handleLeave = () => {
+    if (me && playerName) saveBalance(playerName, me.balance);
     clearSession(); socket.disconnect(); onLeave();
     useGameStore.setState({ gameState: null, pokerMyCards: null });
     window.location.reload();
@@ -494,7 +547,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
   return (
     <div style={{
       height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      background: 'radial-gradient(ellipse at 50% 25%, #0f1e0f 0%, #070d07 100%)',
+      background: 'radial-gradient(ellipse at 50% 20%, #0d1f0d 0%, #060c06 100%)',
     }}>
       {showInfo  && <InfoModal  onClose={() => setShowInfo(false)} />}
       {showLeave && <LeaveModal onConfirm={handleLeave} onCancel={() => setShowLeave(false)} />}
@@ -541,15 +594,27 @@ export function PokerTable({ onLeave }: PokerTableProps) {
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, overflow: 'hidden' }}>
         <div style={{ position: 'relative', width: canvasW, height: canvasH, flexShrink: 0 }}>
 
-          {/* Felt oval */}
+          {/* Felt oval — woven texture + deep green + premium wood rail */}
           <div style={{
             position: 'absolute',
             left: padX, top: padY,
             width: ovalW, height: ovalH,
             borderRadius: '50%',
-            background: 'radial-gradient(ellipse at 40% 36%, #206830 0%, #0f3d1a 52%, #071e0d 100%)',
-            border: '8px solid #7a5a0a',
-            boxShadow: '0 0 0 2.5px #4a3606, 0 12px 48px rgba(0,0,0,0.7), inset 0 0 60px rgba(0,0,0,0.35)',
+            background: '#0c3820',
+            backgroundImage: [
+              'repeating-linear-gradient(0deg, rgba(0,0,0,0.04) 0px, rgba(0,0,0,0.04) 1px, transparent 1px, transparent 4px)',
+              'repeating-linear-gradient(90deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 4px)',
+              'radial-gradient(ellipse 90% 80% at 42% 38%, #216840 0%, #0f4826 52%, #062514 100%)',
+            ].join(', '),
+            /* Wood rail: dark brown outer + gold highlight line */
+            border: '9px solid #3a1c04',
+            boxShadow: [
+              '0 0 0 1.5px rgba(201,168,76,0.28)',   /* gold highlight line */
+              '0 0 0 3px rgba(0,0,0,0.5)',            /* outer dark ring */
+              '0 14px 50px rgba(0,0,0,0.75)',
+              'inset 0 0 90px rgba(0,0,0,0.42)',
+              'inset 0 2px 8px rgba(255,255,255,0.04)',
+            ].join(', '),
           }} />
 
           {/* Community cards */}
@@ -557,29 +622,32 @@ export function PokerTable({ onLeave }: PokerTableProps) {
             position: 'absolute',
             left: '50%', top: padY + ovalH / 2 - CARD_DIMS['md'][1] / 2 - 8,
             transform: 'translateX(-50%)',
-            display: 'flex', gap: 6, alignItems: 'center',
+            display: 'flex', gap: 7, alignItems: 'center',
           }}>
             {state.communityCards.map((c, i) => <PokerCard key={i} card={c} size="md" />)}
             {Array.from({ length: 5 - state.communityCards.length }).map((_, i) => (
               <div key={i} style={{
                 width: CARD_DIMS['md'][0], height: CARD_DIMS['md'][1], borderRadius: 6,
-                border: '1px dashed rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.15)',
+                border: '1px dashed rgba(255,255,255,0.12)',
+                background: 'rgba(0,0,0,0.18)',
               }} />
             ))}
           </div>
 
-          {/* Pot */}
+          {/* Pot badge */}
           {totalPot > 0 && (
             <div style={{
               position: 'absolute', left: '50%',
-              top: padY + ovalH / 2 + CARD_DIMS['md'][1] / 2 + 4,
+              top: padY + ovalH / 2 + CARD_DIMS['md'][1] / 2 + 6,
               transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.65)', borderRadius: 20, padding: '5px 18px',
+              background: 'rgba(0,0,0,0.72)', borderRadius: 20, padding: '5px 20px',
               color: '#c9a84c', fontWeight: 900, fontSize: 15,
-              border: '1px solid rgba(201,168,76,0.4)',
-              whiteSpace: 'nowrap', boxShadow: '0 2px 10px rgba(0,0,0,0.6)',
+              border: '1px solid rgba(201,168,76,0.45)',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 3px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
+              letterSpacing: '0.04em',
             }}>
-              POT: ${totalPot.toLocaleString()}
+              POT ${totalPot.toLocaleString()}
             </div>
           )}
 
@@ -621,17 +689,20 @@ export function PokerTable({ onLeave }: PokerTableProps) {
           {state.phase === 'showdown' && state.winners && state.winners.length > 0 && (
             <div style={{
               position: 'absolute', left: '50%',
-              top: padY + ovalH / 2 - CARD_DIMS['md'][1] / 2 - 36,
+              top: padY + ovalH / 2 - CARD_DIMS['md'][1] / 2 - 42,
               transform: 'translateX(-50%)',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
             }}>
               {state.winners.map((w, i) => (
                 <div key={i} style={{
-                  background: 'rgba(76,175,80,0.22)', border: '1px solid rgba(76,175,80,0.5)',
-                  borderRadius: 8, padding: '5px 16px',
-                  color: '#81c784', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+                  background: 'linear-gradient(135deg, rgba(40,140,60,0.35), rgba(30,110,50,0.2))',
+                  border: '1px solid rgba(76,200,80,0.5)',
+                  borderRadius: 10, padding: '6px 18px',
+                  color: '#7de882', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
+                  boxShadow: '0 0 20px rgba(40,160,60,0.25), 0 4px 12px rgba(0,0,0,0.4)',
+                  letterSpacing: '0.02em',
                 }}>
-                  🏆 {w.playerName} wins ${w.amount.toLocaleString()} — {w.handName}
+                  🏆 {w.playerName} — {w.handName} · +${w.amount.toLocaleString()}
                 </div>
               ))}
             </div>
