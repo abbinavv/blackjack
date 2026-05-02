@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { socket } from '../lib/socket';
-import { useGameStore, clearSession } from '../store/gameStore';
+import { useGameStore, clearSession, saveBalance } from '../store/gameStore';
 import { PokerPublicGameState, PokerPublicPlayer, Card } from '../types';
 import { playButton, playChipClink } from '../lib/sounds';
 
@@ -460,7 +460,16 @@ export function PokerTable({ onLeave }: PokerTableProps) {
   const totalPot = state.pots.reduce((s, p) => s + p.amount, 0);
   const myCards = pokerMyCards ?? (showCards ? me?.holeCards ?? null : null);
 
+  const playerName = useGameStore(s => s.playerName);
+
+  useEffect(() => {
+    if (state.phase === 'showdown' && me && playerName) {
+      saveBalance(playerName, me.balance);
+    }
+  }, [state.phase, me?.balance, playerName]);
+
   const handleLeave = () => {
+    if (me && playerName) saveBalance(playerName, me.balance);
     clearSession(); socket.disconnect(); onLeave();
     useGameStore.setState({ gameState: null, pokerMyCards: null });
     window.location.reload();
