@@ -1,14 +1,24 @@
+import { useEffect, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { PublicGameState } from '../types';
 import { DealerArea } from './DealerArea';
 import { PlayerSeat } from './PlayerSeat';
 import { BetPanel } from './BetPanel';
 import { InsurancePanel } from './InsurancePanel';
 import { GameControls } from './GameControls';
 import { RoundSummary } from './RoundSummary';
+import { playShuffle } from '../lib/sounds';
 
 export function Table() {
-  const { gameState, roomCode, myId } = useGameStore();
-  if (!gameState || !roomCode) return null;
+  const { gameState: rawState, roomCode, myId } = useGameStore();
+  if (!rawState || !roomCode) return null;
+  const gameState = rawState as PublicGameState;
+
+  const prevReshuffle = useRef(false);
+  useEffect(() => {
+    if (gameState.needsReshuffle && !prevReshuffle.current) playShuffle();
+    prevReshuffle.current = !!gameState.needsReshuffle;
+  }, [gameState.needsReshuffle]);
 
   const me = gameState.players.find(p => p.id === myId);
   const myIndex = gameState.players.findIndex(p => p.id === myId);

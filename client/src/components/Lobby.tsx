@@ -3,8 +3,12 @@ import { socket } from '../lib/socket';
 import { useGameStore, loadBalance, saveSession } from '../store/gameStore';
 import { playButton } from '../lib/sounds';
 
-export function Lobby() {
-  const { setMyId, setRoomCode, setPlayerName, setError, error } = useGameStore();
+interface LobbyProps {
+  gameType: 'blackjack' | 'roulette';
+}
+
+export function Lobby({ gameType }: LobbyProps) {
+  const { setMyId, setRoomCode, setPlayerName, setGameType, setError, error } = useGameStore();
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [mode, setMode] = useState<'home' | 'join'>('home');
@@ -41,10 +45,10 @@ export function Lobby() {
     const trimmed = name.trim();
     const savedBalance = loadBalance(trimmed);
     connect(() => {
-      socket.emit('createRoom', { name: trimmed, savedBalance }, (roomCode: string) => {
+      socket.emit('createRoom', { name: trimmed, savedBalance, gameType }, (roomCode: string) => {
         setPlayerName(trimmed);
         setRoomCode(roomCode);
-        saveSession(roomCode, trimmed);
+        saveSession(roomCode, trimmed, gameType);
         setLoading(false);
       });
     });
@@ -68,20 +72,29 @@ export function Lobby() {
           if (!ok) return setError(err ?? 'Failed to join');
           setPlayerName(trimmed);
           setRoomCode(roomCode);
-          saveSession(roomCode, trimmed);
+          saveSession(roomCode, trimmed, gameType);
         }
       );
     });
   };
+
+  const gameLabel = gameType === 'roulette' ? 'Roulette' : 'Blackjack';
+  const accentColor = gameType === 'roulette' ? 'text-red-400' : 'text-gold';
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4"
          style={{ background: 'radial-gradient(ellipse at 50% 30%, #0d2818 0%, #050d0a 100%)' }}>
 
       <div className="text-center mb-10">
-        <div className="text-6xl mb-3">♠</div>
-        <h1 className="font-display text-5xl font-black text-gold tracking-tight">Blackjack</h1>
-        <p className="text-white/30 text-sm mt-2 tracking-widest uppercase">Vegas Strip Rules</p>
+        <div className="text-5xl mb-3">
+          {gameType === 'roulette' ? '🎡' : '♠'}
+        </div>
+        <h1 className={`font-display text-5xl font-black tracking-tight ${accentColor}`}>
+          {gameLabel}
+        </h1>
+        <p className="text-white/30 text-sm mt-2 tracking-widest uppercase">
+          {gameType === 'roulette' ? 'European Single Zero' : 'Vegas Strip Rules'}
+        </p>
       </div>
 
       <div
@@ -146,11 +159,30 @@ export function Lobby() {
         )}
       </div>
 
-      <div className="mt-8 flex gap-6 text-white/25 text-xs">
-        <span>2–6 Players</span>
-        <span>$10–$1K Bets</span>
-        <span>3:2 Blackjack</span>
-        <span>S17</span>
+      <div className="mt-6">
+        <button
+          onClick={() => { playButton(); setGameType(null); }}
+          className="text-white/30 text-sm hover:text-white/60 transition-colors flex items-center gap-1.5"
+        >
+          ← Back to Games
+        </button>
+      </div>
+
+      <div className="mt-6 flex gap-6 text-white/25 text-xs">
+        {gameType === 'roulette' ? (
+          <>
+            <span>2–8 Players</span>
+            <span>European 0–36</span>
+            <span>35:1 Straight</span>
+          </>
+        ) : (
+          <>
+            <span>2–6 Players</span>
+            <span>$10–$1K Bets</span>
+            <span>3:2 Blackjack</span>
+            <span>S17</span>
+          </>
+        )}
       </div>
     </div>
   );

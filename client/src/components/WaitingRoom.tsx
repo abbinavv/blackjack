@@ -1,5 +1,6 @@
 import { socket } from '../lib/socket';
 import { useGameStore, clearSession } from '../store/gameStore';
+import { PublicGameState, RoulettePublicGameState } from '../types';
 import { playButton } from '../lib/sounds';
 
 function fallbackCopy(text: string) {
@@ -13,12 +14,23 @@ function fallbackCopy(text: string) {
 }
 
 export function WaitingRoom() {
-  const { gameState, roomCode, myId, setRoomCode } = useGameStore();
-  if (!gameState || !roomCode) return null;
+  const { gameState: rawState, roomCode, myId, setRoomCode } = useGameStore();
+  if (!rawState || !roomCode) return null;
 
-  const me = gameState.players.find(p => p.id === myId);
+  const isRoulette = (rawState as RoulettePublicGameState).gameType === 'roulette';
+
+  // For blackjack we need wantsSitOut; for roulette we don't have it
+  const bjState = isRoulette ? null : rawState as PublicGameState;
+  const players = rawState.players;
+
+  const me = players.find(p => p.id === myId);
   const isHost = me?.isHost ?? false;
-  const activePlayers = gameState.players.filter(p => !p.wantsSitOut);
+
+  // wantsSitOut only exists on blackjack players
+  const meWantsSitOut = bjState ? (bjState.players.find(p => p.id === myId) as PublicGameState['players'][0] | undefined)?.wantsSitOut ?? false : false;
+  const activePlayers = bjState
+    ? bjState.players.filter(p => !(p as PublicGameState['players'][0]).wantsSitOut)
+    : players;
   const canStart = activePlayers.length >= 2;
 
   const handleStart = () => {
@@ -30,13 +42,12 @@ export function WaitingRoom() {
     clearSession();
     socket.disconnect();
     setRoomCode(null);
-    useGameStore.setState({ gameState: null });
+    useGameStore.setState({ gameState: null, gameType: null });
     window.location.reload();
   };
 
   const copyCode = () => {
     playButton();
-    // Use fallback that works without permission on older/mobile browsers
     if (navigator.clipboard) {
       navigator.clipboard.writeText(roomCode).catch(() => fallbackCopy(roomCode));
     } else {
@@ -46,16 +57,21 @@ export function WaitingRoom() {
 
   const toggleSitOut = () => {
     playButton();
-    socket.emit('sitOut', { roomCode, sitOut: !me?.wantsSitOut });
+    socket.emit('sitOut', { roomCode, sitOut: !meWantsSitOut });
   };
+
+  const gameIcon = isRoulette ? '🎡' : '♠';
+  const gameTitle = isRoulette ? 'Roulette' : 'Blackjack';
+  const maxPlayers = isRoulette ? 8 : 6;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4"
          style={{ background: 'radial-gradient(ellipse at 50% 30%, #0d2818 0%, #050d0a 100%)' }}>
 
       <div className="text-center mb-8">
-        <div className="text-4xl mb-2">♠</div>
+        <div className="text-4xl mb-2">{gameIcon}</div>
         <h1 className="font-display text-3xl font-bold text-gold">Waiting Room</h1>
+        <p className="text-white/30 text-xs mt-1 tracking-widest uppercase">{gameTitle}</p>
       </div>
 
       {/* Room code */}
@@ -76,28 +92,33 @@ export function WaitingRoom() {
         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}
       >
         <div className="text-xs uppercase tracking-widest text-white/40 mb-3">
-          Players ({gameState.players.length}/6)
+          Players ({players.length}/{maxPlayers})
         </div>
-        {gameState.players.map(p => (
-          <div
-            key={p.id}
-            className={`flex items-center justify-between px-3 py-2.5 rounded-xl
-              ${p.id === myId ? 'bg-gold/10 border border-gold/20' : 'bg-white/5'}
-              ${p.wantsSitOut ? 'opacity-50' : ''}`}
-          >
-            <div className="flex items-center gap-2">
-              {p.isHost && <span className="text-gold text-sm">★</span>}
-              <span className="text-sm font-medium text-white">
-                {p.name}
-                {p.id === myId && <span className="text-white/40 text-xs ml-1">(you)</span>}
-              </span>
-              {p.wantsSitOut && <span className="text-[10px] text-white/40 italic">sitting out</span>}
+        {players.map(p => {
+          const wantsSitOut = bjState
+            ? (bjState.players.find(bp => bp.id === p.id) as PublicGameState['players'][0] | undefined)?.wantsSitOut ?? false
+            : false;
+          return (
+            <div
+              key={p.id}
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl
+                ${p.id === myId ? 'bg-gold/10 border border-gold/20' : 'bg-white/5'}
+                ${wantsSitOut ? 'opacity-50' : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                {p.isHost && <span className="text-gold text-sm">★</span>}
+                <span className="text-sm font-medium text-white">
+                  {p.name}
+                  {p.id === myId && <span className="text-white/40 text-xs ml-1">(you)</span>}
+                </span>
+                {wantsSitOut && <span className="text-[10px] text-white/40 italic">sitting out</span>}
+              </div>
+              <span className="text-xs text-green-400 font-bold">${p.balance.toLocaleString()}</span>
             </div>
-            <span className="text-xs text-green-400 font-bold">${p.balance.toLocaleString()}</span>
-          </div>
-        ))}
+          );
+        })}
 
-        {gameState.players.length < 6 && (
+        {players.length < maxPlayers && (
           <div className="flex items-center gap-2 px-3 py-2 text-white/25 text-sm">
             <span className="text-lg">+</span>
             <span>Waiting for players...</span>
@@ -126,16 +147,16 @@ export function WaitingRoom() {
           </div>
         )}
 
-        {me && (
+        {me && !isRoulette && (
           <button
             onClick={toggleSitOut}
             className={`w-full py-2.5 text-sm rounded-xl transition-colors font-medium ${
-              me.wantsSitOut
+              meWantsSitOut
                 ? 'bg-gold/15 text-gold border border-gold/25 hover:bg-gold/25'
                 : 'btn-ghost'
             }`}
           >
-            {me.wantsSitOut ? '✓ Sitting out — click to play' : 'Sit Out'}
+            {meWantsSitOut ? '✓ Sitting out — click to play' : 'Sit Out'}
           </button>
         )}
 

@@ -3,6 +3,7 @@ import { socket } from '../lib/socket';
 import { useGameStore, saveBalance } from '../store/gameStore';
 import { playWin, playLose, playBlackjack } from '../lib/sounds';
 import { fullHandScore, isBlackjack as bjCheck } from '../lib/clientRules';
+import type { PublicGameState } from '../types';
 
 function getHandResult(
   hand: { cards: { rank: string; suit: string; faceUp: boolean }[]; bet: number; status: string; isSplit: boolean },
@@ -25,7 +26,8 @@ function getHandResult(
 }
 
 export function RoundSummary() {
-  const { gameState, roomCode, myId, playerName, addToast } = useGameStore();
+  const { gameState: _gameState, roomCode, myId, playerName, addToast } = useGameStore();
+  const gameState = _gameState as PublicGameState | null;
 
   useEffect(() => {
     if (!gameState || gameState.phase !== 'complete') return;
