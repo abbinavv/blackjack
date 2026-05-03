@@ -16,13 +16,15 @@ export function Hand({ hand, isActive, showScore = true, compact = false }: Hand
     blackjack: 'text-yellow-400',
   }[hand.status];
 
+  const wrapperAnim = hand.status === 'bust' ? 'animate-shakeX' : hand.status === 'blackjack' ? 'animate-bjGlow' : '';
+
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className={`flex flex-col items-center gap-1 rounded-lg ${wrapperAnim}`}>
       {/* Cards */}
       <div className="flex">
         {hand.cards.map((card, i) => (
           <div key={`${card.suit}-${card.rank}-${i}`} style={{ marginLeft: i > 0 ? -20 : 0 }}>
-            <Card card={card} animate={true} small={compact} />
+            <Card card={card} animate={true} small={compact} dealDelay={i * 80} />
           </div>
         ))}
       </div>

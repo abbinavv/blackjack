@@ -248,6 +248,7 @@ export function RouletteTable() {
                   balance={me.balance}
                   cellSize={layout.cellSize}
                   edgeCellSize={layout.edgeCell}
+                  winningNumber={state.phase === 'complete' ? state.spinResult : null}
                 />
               </div>
               {state.phase === 'betting' && pendingBets.length > 0 && !betsSubmitted && (
@@ -267,6 +268,17 @@ export function RouletteTable() {
             </div>
           ) : (
             <div className="text-white/15 text-xs">Waiting for host to start...</div>
+          )}
+
+          {/* Float-up win/loss indicator */}
+          {state.phase === 'complete' && me && me.lastWin !== 0 && (
+            <div
+              key={state.round}
+              className={`animate-floatUp font-black text-2xl pointer-events-none select-none
+                          ${me.lastWin > 0 ? 'text-green-400' : 'text-red-400'}`}
+            >
+              {me.lastWin > 0 ? `+$${me.lastWin}` : `-$${Math.abs(me.lastWin)}`}
+            </div>
           )}
 
           {/* Results strip */}

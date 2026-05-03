@@ -86,18 +86,19 @@ export function GameSelect({ onSelectGame }: GameSelectProps) {
 
       {/* Game cards */}
       <div className="flex flex-col sm:flex-row gap-4 w-full max-w-2xl">
-        {GAMES.map((game) => (
+        {GAMES.map((game, index) => (
           <button
             key={game.id}
             onClick={() => onSelectGame(game.id)}
             className="flex-1 rounded-2xl text-left cursor-pointer
                        transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]
-                       hover:-translate-y-1"
+                       hover:-translate-y-1 animate-fadeIn"
             style={{
               background: game.accent,
               border: `1px solid ${game.border}`,
               padding: '28px 22px 22px',
               boxShadow: `0 8px 32px ${game.glow}, 0 2px 8px rgba(0,0,0,0.4)`,
+              animationDelay: `${index * 120}ms`,
             }}
           >
             {/* Icon */}

@@ -94,16 +94,17 @@ export function WaitingRoom() {
         <div className="text-xs uppercase tracking-widest text-white/40 mb-3">
           Players ({players.length}/{maxPlayers})
         </div>
-        {players.map(p => {
+        {players.map((p, idx) => {
           const wantsSitOut = bjState
             ? (bjState.players.find(bp => bp.id === p.id) as PublicGameState['players'][0] | undefined)?.wantsSitOut ?? false
             : false;
           return (
             <div
               key={p.id}
-              className={`flex items-center justify-between px-3 py-2.5 rounded-xl
+              className={`flex items-center justify-between px-3 py-2.5 rounded-xl animate-fadeIn
                 ${p.id === myId ? 'bg-gold/10 border border-gold/20' : 'bg-white/5'}
                 ${wantsSitOut ? 'opacity-50' : ''}`}
+              style={{ animationDelay: `${idx * 60}ms` }}
             >
               <div className="flex items-center gap-2">
                 {p.isHost && <span className="text-gold text-sm">★</span>}

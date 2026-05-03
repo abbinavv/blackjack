@@ -6,7 +6,7 @@ export function ToastContainer() {
   return (
     <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
       {error && (
-        <div className="px-4 py-3 rounded-xl text-sm font-medium animate-slideUp shadow-xl"
+        <div className="px-4 py-3 rounded-xl text-sm font-medium animate-slideDown shadow-xl"
              style={{ background: '#7f1d1d', border: '1px solid #ef4444', color: '#fca5a5' }}>
           ⚠ {error}
         </div>
@@ -14,7 +14,7 @@ export function ToastContainer() {
       {toasts.map(t => (
         <div
           key={t.id}
-          className="px-4 py-3 rounded-xl text-sm font-bold animate-slideUp shadow-xl"
+          className="px-4 py-3 rounded-xl text-sm font-bold animate-slideDown shadow-xl"
           style={{
             background: t.type === 'win'
               ? 'rgba(20,80,30,0.97)'
