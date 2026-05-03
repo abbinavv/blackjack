@@ -14,7 +14,30 @@ function makeBetKey(type: RouletteBetType, numbers: number[]): string {
 }
 
 interface BetEntry { type: RouletteBetType; numbers: number[]; amount: number; }
-interface Props { disabled: boolean; onBetsChange: (bets: BetEntry[]) => void; balance: number; cellSize?: number; edgeCellSize?: number; }
+interface Props { disabled: boolean; onBetsChange: (bets: BetEntry[]) => void; balance: number; cellSize?: number; edgeCellSize?: number; winningNumber?: number | null; }
+
+function isOutsideWin(type: RouletteBetType, n: number): boolean {
+  if (n === 0) return false;
+  switch (type) {
+    case 'red':   return col(n) === 'red';
+    case 'black': return col(n) === 'black';
+    case 'odd':   return n % 2 !== 0;
+    case 'even':  return n % 2 === 0;
+    case 'low':   return n >= 1 && n <= 18;
+    case 'high':  return n >= 19 && n <= 36;
+    default: return false;
+  }
+}
+
+function isDozenWin(dozenNum: number, n: number): boolean {
+  if (n === 0) return false;
+  return Math.ceil(n / 12) === dozenNum;
+}
+
+function isColumnWin(colNum: number, n: number): boolean {
+  if (n === 0) return false;
+  return n % 3 === (colNum === 3 ? 0 : colNum);
+}
 
 const ROWS = [
   [3,6,9,12,15,18,21,24,27,30,33,36],
@@ -22,7 +45,7 @@ const ROWS = [
   [1,4,7,10,13,16,19,22,25,28,31,34],
 ];
 
-export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 44, edgeCellSize }: Props) {
+export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 44, edgeCellSize, winningNumber = null }: Props) {
   const N = cellSize;
   const Z = edgeCellSize ?? Math.max(28, Math.round(cellSize * 0.75));
   const C = Z;
@@ -112,13 +135,15 @@ export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 4
         {/* Zero — spans all 3 rows */}
         <button
           onClick={() => addBet('straight', [0])}
-          className={`${base} text-base font-black`}
+          className={`${base} text-base font-black ${winningNumber === 0 ? 'animate-winCell' : ''}`}
           style={{
             gridRow: '1 / 4',
             gridColumn: '1',
-            background: '#166534',
+            background: winningNumber === 0 ? '#15803d' : '#166534',
             borderRight: '2px solid rgba(201,168,76,0.4)',
             height: N * 3,
+            outline: winningNumber === 0 ? '2px solid rgba(201,168,76,0.8)' : undefined,
+            zIndex: winningNumber === 0 ? 1 : undefined,
           }}
         >
           0
@@ -129,16 +154,22 @@ export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 4
         {ROWS.map((row, rowIdx) =>
           row.map((n, colIdx) => {
             const c = col(n);
-            const bg = c === 'red' ? '#7f1d1d' : '#1c1c1e';
+            const isWinner = winningNumber != null && n === winningNumber;
+            const bg  = isWinner ? (c === 'red' ? '#b91c1c' : '#3a3a3e') : (c === 'red' ? '#7f1d1d' : '#1c1c1e');
             const bgH = c === 'red' ? '#991b1b' : '#2d2d30';
             const bet = betOn('straight', [n]);
             return (
               <button key={n}
                 onClick={() => addBet('straight', [n])}
-                className={`${base}`}
-                style={{ gridRow: rowIdx + 1, gridColumn: colIdx + 2, background: bg, width: N, height: N }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = bgH; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = bg; }}
+                className={`${base} ${isWinner ? 'animate-winCell' : ''}`}
+                style={{
+                  gridRow: rowIdx + 1, gridColumn: colIdx + 2,
+                  background: bg, width: N, height: N,
+                  outline: isWinner ? '2px solid rgba(201,168,76,0.8)' : undefined,
+                  zIndex: isWinner ? 1 : undefined,
+                }}
+                onMouseEnter={e => { if (!isWinner) (e.currentTarget as HTMLElement).style.background = bgH; }}
+                onMouseLeave={e => { if (!isWinner) (e.currentTarget as HTMLElement).style.background = bg; }}
               >
                 {n}
                 <Chip amount={bet} />
@@ -152,22 +183,26 @@ export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 4
           { label: '2:1', type: 'column' as RouletteBetType, numbers: [3] },
           { label: '2:1', type: 'column' as RouletteBetType, numbers: [2] },
           { label: '2:1', type: 'column' as RouletteBetType, numbers: [1] },
-        ].map((cb, i) => (
-          <button key={i}
-            onClick={() => addBet(cb.type, cb.numbers)}
-            className={`${base} text-gold/80 text-[10px]`}
-            style={{
-              gridRow: i + 1,
-              gridColumn: '14',
-              background: '#1c2a1c',
-              width: C, height: N,
-              borderLeft: '2px solid rgba(201,168,76,0.4)',
-            }}
-          >
-            2:1
-            <Chip amount={betOn(cb.type, cb.numbers)} />
-          </button>
-        ))}
+        ].map((cb, i) => {
+          const isWinner = winningNumber != null && isColumnWin(cb.numbers[0], winningNumber);
+          return (
+            <button key={i}
+              onClick={() => addBet(cb.type, cb.numbers)}
+              className={`${base} text-gold/80 text-[10px] ${isWinner ? 'animate-winCell' : ''}`}
+              style={{
+                gridRow: i + 1,
+                gridColumn: '14',
+                background: isWinner ? 'rgba(201,168,76,0.2)' : '#1c2a1c',
+                width: C, height: N,
+                borderLeft: '2px solid rgba(201,168,76,0.4)',
+                outline: isWinner ? '2px solid rgba(201,168,76,0.7)' : undefined,
+              }}
+            >
+              2:1
+              <Chip amount={betOn(cb.type, cb.numbers)} />
+            </button>
+          );
+        })}
       </div>
 
       {/* Dozens row */}
@@ -185,16 +220,23 @@ export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 4
           { label: '1st 12', type: 'dozen' as RouletteBetType, numbers: [1] },
           { label: '2nd 12', type: 'dozen' as RouletteBetType, numbers: [2] },
           { label: '3rd 12', type: 'dozen' as RouletteBetType, numbers: [3] },
-        ].map(db => (
-          <button key={db.label}
-            onClick={() => addBet(db.type, db.numbers)}
-            className={`${base} text-white/60 text-[11px]`}
-            style={{ background: '#1a2e1a', height: SM, borderRight: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            {db.label}
-            <Chip amount={betOn(db.type, db.numbers)} />
-          </button>
-        ))}
+        ].map(db => {
+          const isWinner = winningNumber != null && isDozenWin(db.numbers[0], winningNumber);
+          return (
+            <button key={db.label}
+              onClick={() => addBet(db.type, db.numbers)}
+              className={`${base} text-white/60 text-[11px] ${isWinner ? 'animate-winCell' : ''}`}
+              style={{
+                background: isWinner ? 'rgba(201,168,76,0.18)' : '#1a2e1a',
+                height: SM, borderRight: '1px solid rgba(255,255,255,0.08)',
+                outline: isWinner ? '2px solid rgba(201,168,76,0.7)' : undefined,
+              }}
+            >
+              {db.label}
+              <Chip amount={betOn(db.type, db.numbers)} />
+            </button>
+          );
+        })}
         <div style={{ background: '#0d1f14' }} />
       </div>
 
@@ -216,16 +258,23 @@ export function RouletteBetBoard({ disabled, onBetsChange, balance, cellSize = 4
           { label: '● Black', type: 'black' as RouletteBetType, bg: '#1c1c1e' },
           { label: 'Odd',     type: 'odd' as RouletteBetType,   bg: '#1a2e1a' },
           { label: '19–36',   type: 'high' as RouletteBetType,  bg: '#1a2e1a' },
-        ].map(ob => (
-          <button key={ob.type}
-            onClick={() => addBet(ob.type, [])}
-            className={`${base} text-white/80 text-[11px] hover:brightness-125`}
-            style={{ background: ob.bg, height: SM, borderRight: '1px solid rgba(255,255,255,0.08)' }}
-          >
-            {ob.label}
-            <Chip amount={betOn(ob.type, [])} />
-          </button>
-        ))}
+        ].map(ob => {
+          const isWinner = winningNumber != null && isOutsideWin(ob.type, winningNumber);
+          return (
+            <button key={ob.type}
+              onClick={() => addBet(ob.type, [])}
+              className={`${base} text-white/80 text-[11px] hover:brightness-125 ${isWinner ? 'animate-winCell' : ''}`}
+              style={{
+                background: isWinner ? (ob.type === 'red' ? '#991b1b' : ob.type === 'black' ? '#3a3a3e' : 'rgba(201,168,76,0.18)') : ob.bg,
+                height: SM, borderRight: '1px solid rgba(255,255,255,0.08)',
+                outline: isWinner ? '2px solid rgba(201,168,76,0.7)' : undefined,
+              }}
+            >
+              {ob.label}
+              <Chip amount={betOn(ob.type, [])} />
+            </button>
+          );
+        })}
         <div style={{ background: '#0d1f14' }} />
       </div>
     </div>

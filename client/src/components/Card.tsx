@@ -10,9 +10,10 @@ interface Props {
   card: CardType;
   animate?: boolean;
   small?: boolean;
+  dealDelay?: number;
 }
 
-export function Card({ card, animate = true, small = false }: Props) {
+export function Card({ card, animate = true, small = false, dealDelay = 0 }: Props) {
   const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
   const symbol = SUIT_SYMBOL[card.suit];
   const suitClass = isRed ? 'red-suit' : 'black-suit';
@@ -42,6 +43,7 @@ export function Card({ card, animate = true, small = false }: Props) {
     const el = ref.current;
     if (!el) return;
     el.classList.remove('animate-dealIn');
+    if (dealDelay > 0) el.style.animationDelay = `${dealDelay}ms`;
     void el.offsetWidth;
     el.classList.add('animate-dealIn');
   }, [animate]);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { socket } from '../lib/socket';
 import { useGameStore, clearSession, saveBalance } from '../store/gameStore';
 import { PokerPublicGameState, PokerPublicPlayer, Card } from '../types';
@@ -503,6 +503,19 @@ export function PokerTable({ onLeave }: PokerTableProps) {
     }
   }, [pokerGameState?.phase, me?.balance, playerName]);
 
+  // Pot pop animation — track changes before the null guard so hook order stays stable
+  const computedPot = pokerGameState
+    ? pokerGameState.pots.reduce((s, p) => s + p.amount, 0)
+    : 0;
+  const prevPot = useRef(0);
+  const [potAnimKey, setPotAnimKey] = useState(0);
+  useEffect(() => {
+    if (computedPot > 0 && computedPot !== prevPot.current) {
+      setPotAnimKey(k => k + 1);
+    }
+    prevPot.current = computedPot;
+  }, [computedPot]);
+
   if (!pokerGameState || !roomCode) return null;
 
   // pokerGameState narrowed to non-null after the guard
@@ -625,7 +638,21 @@ export function PokerTable({ onLeave }: PokerTableProps) {
             transform: 'translateX(-50%)',
             display: 'flex', gap: 7, alignItems: 'center',
           }}>
-            {state.communityCards.map((c, i) => <PokerCard key={i} card={c} size="md" />)}
+            {state.communityCards.map((c, i) => (
+              <div
+                key={`cc-${i}`}
+                style={{
+                  animationName: 'dealIn',
+                  animationDuration: '0.4s',
+                  animationTimingFunction: 'cubic-bezier(0.34,1.56,0.64,1)',
+                  animationFillMode: 'forwards',
+                  animationDelay: `${i * 70}ms`,
+                  opacity: 0,
+                }}
+              >
+                <PokerCard card={c} size="md" />
+              </div>
+            ))}
             {Array.from({ length: 5 - state.communityCards.length }).map((_, i) => (
               <div key={i} style={{
                 width: CARD_DIMS['md'][0], height: CARD_DIMS['md'][1], borderRadius: 6,
@@ -637,7 +664,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
 
           {/* Pot badge */}
           {totalPot > 0 && (
-            <div style={{
+            <div key={potAnimKey} style={{
               position: 'absolute', left: '50%',
               top: padY + ovalH / 2 + CARD_DIMS['md'][1] / 2 + 6,
               transform: 'translateX(-50%)',
@@ -647,6 +674,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
               whiteSpace: 'nowrap',
               boxShadow: '0 3px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)',
               letterSpacing: '0.04em',
+              animation: 'potPop 0.4s cubic-bezier(0.34,1.56,0.64,1)',
             }}>
               POT ${totalPot.toLocaleString()}
             </div>
@@ -691,6 +719,7 @@ export function PokerTable({ onLeave }: PokerTableProps) {
                   color: '#7de882', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
                   boxShadow: '0 0 20px rgba(40,160,60,0.25), 0 4px 12px rgba(0,0,0,0.4)',
                   letterSpacing: '0.02em',
+                  animation: `scaleIn 0.35s cubic-bezier(0.34,1.56,0.64,1) ${i * 150}ms both`,
                 }}>
                   🏆 {w.playerName} — {w.handName} · +${w.amount.toLocaleString()}
                 </div>

@@ -73,7 +73,7 @@ export function RoundSummary() {
   return (
     <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div
-        className="w-full max-w-lg rounded-2xl p-5 animate-slideUp flex flex-col gap-4"
+        className="w-full max-w-lg rounded-2xl p-5 animate-scaleIn flex flex-col gap-4"
         style={{ background: '#0d1f14', border: '1px solid rgba(201,168,76,0.3)', maxHeight: '90vh', overflowY: 'auto' }}
       >
         {/* Header */}
@@ -87,7 +87,7 @@ export function RoundSummary() {
 
         {/* Player rows */}
         <div className="space-y-2">
-          {gameState.players.filter(p => !p.isSittingOut && p.hands.length > 0).map(player => {
+          {gameState.players.filter(p => !p.isSittingOut && p.hands.length > 0).map((player, idx) => {
             let totalNet = 0;
             if (player.insuranceBet > 0) {
               totalNet += dealerBJ ? player.insuranceBet * 2 : -player.insuranceBet;
@@ -96,7 +96,8 @@ export function RoundSummary() {
             return (
               <div
                 key={player.id}
-                className={`rounded-xl p-3 ${player.id === myId ? 'bg-gold/10 border border-gold/30' : 'bg-white/5'}`}
+                className={`rounded-xl p-3 animate-fadeIn ${player.id === myId ? 'bg-gold/10 border border-gold/30' : 'bg-white/5'}`}
+                style={{ animationDelay: `${idx * 60 + 80}ms` }}
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="font-bold text-sm text-white">
